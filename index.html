@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Desenrola</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <h1>Desenrola</h1>
+    <p id="status">Escolha uma mecânica</p>
+
+    <div id="game-area">
+      <div id="hud">
+        <div id="hud-level" class="hud-item hidden">Nível 1</div>
+        <div id="hud-pairs" class="hud-item hidden">Pares: 0/0</div>
+        <div id="hud-timer" class="hud-item hidden">⏱ 60s</div>
+        <div id="hud-score" class="hud-item hidden">⭐ 0</div>
+        <button id="btn-mute" type="button" title="Ligar/desligar som">🔊</button>
+      </div>
+      <canvas id="canvas" width="480" height="360"></canvas>
+      <div id="game-buttons">
+        <button id="btn-new">Nova prateleira</button>
+        <button id="btn-menu">← Menu</button>
+      </div>
+    </div>
+
+    <div id="menu">
+      <button class="menu-btn" id="btn-shelf">
+        <span class="menu-icon">▤</span>
+        <span class="menu-label">Prateleira</span>
+        <span class="menu-count" id="count-shelf">novo</span>
+      </button>
+      <button class="menu-btn" id="btn-threads">
+        <span class="menu-icon">〜</span>
+        <span class="menu-label">Fios</span>
+        <span class="menu-count" id="count-threads">novo</span>
+      </button>
+      <button class="menu-btn menu-btn-zen" id="btn-zen">
+        <span class="menu-icon">🌿</span>
+        <span class="menu-label">Zen</span>
+        <span class="menu-count">relax</span>
+      </button>
+    </div>
+
+    <div id="menu-extras">
+      <button id="btn-achievements" type="button">🏆 Conquistas</button>
+      <button id="btn-reset" type="button">Zerar progresso</button>
+    </div>
+
+    <div id="achievements-panel" class="hidden">
+      <div class="ach-card">
+        <h2>Conquistas</h2>
+        <ul id="ach-list"></ul>
+        <button id="btn-close-ach">Fechar</button>
+      </div>
+    </div>
+
+    <div id="toast" class="hidden">
+      <span id="toast-icon">🏆</span>
+      <span id="toast-text">Conquista desbloqueada!</span>
+    </div>
+
+    <div id="win-overlay" class="hidden">
+      <div class="win-card">
+        <h2 id="win-title">Prateleira pareada ✓</h2>
+        <p id="win-points">+0 pontos</p>
+        <p id="win-breakdown" class="win-breakdown"></p>
+        <p id="win-total" class="win-total">Total: 0 pontos</p>
+        <button id="btn-next-level">Próximo nível</button>
+      </div>
+    </div>
+  </div>
+  <script src="game.js"></script>
+</body>
+</html>
