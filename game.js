@@ -1,9 +1,6 @@
 /* ============================================================
    DESENROLA — BACKUP 5 + Painel de Ajuda + Manifest PWA
-   ------------------------------------------------------------
-   Novidade desta versão:
-   - Botão "❓ Ajuda" no menu, abre painel com instruções.
-   - manifest.json + icon.svg para instalar como app no celular.
+   Correção: painéis começam escondidos mesmo com cache agressivo.
    ============================================================ */
 
 (function () {
@@ -401,9 +398,9 @@
     }, 200);
   }
 
-  // ==========================================================
-  // DESENHOS DOS OBJETOS
-  // ==========================================================
+  /* ==========================================================
+     DESENHOS DOS OBJETOS
+     ========================================================== */
   function drawFrasco(w, h, fill, accent) {
     ctx.fillStyle = fill;
     ctx.beginPath();
@@ -626,9 +623,9 @@
   let currentScene = null;
   let lastTime = 0;
 
-  // ==========================================================
-  // CENA: PRATELEIRA
-  // ==========================================================
+  /* ==========================================================
+     CENA: PRATELEIRA
+     ========================================================== */
   const ShelfScene = {
     shelves: [], items: [], dragging: null, returning: [],
     complete: false, celebrationTimer: 0,
@@ -1109,9 +1106,9 @@
     },
   };
 
-  // ==========================================================
-  // CENA: FIOS
-  // ==========================================================
+  /* ==========================================================
+     CENA: FIOS
+     ========================================================== */
   function createThread(index, color, threadCount, nodesPerThread, isElectric) {
     const margin = CONFIG.THREAD_MARGIN;
     const usableW = W - 2 * margin;
@@ -1636,6 +1633,13 @@
   function init() {
     Progress.load();
     updateMuteButton();
+
+    // Garante que painéis e overlay começam escondidos (à prova de cache)
+    helpPanel.classList.add('hidden');
+    achPanel.classList.add('hidden');
+    winOverlay.classList.add('hidden');
+    winOverlay.classList.remove('visible');
+
     const size = setupCanvas();
     W = size.width; H = size.height;
     canvas.addEventListener('mousedown', onDown);
