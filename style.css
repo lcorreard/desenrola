@@ -89,7 +89,6 @@ h1 {
   background: rgba(211, 47, 47, 0.12);
 }
 
-/* Botão de mudo */
 #btn-mute {
   font-family: inherit;
   font-size: 14px;
@@ -276,6 +275,7 @@ h1 {
   flex-wrap: wrap;
 }
 
+#btn-help,
 #btn-achievements,
 #btn-reset {
   font-family: inherit;
@@ -291,16 +291,118 @@ h1 {
   -webkit-tap-highlight-color: transparent;
 }
 
+#btn-help:hover,
 #btn-achievements:hover,
 #btn-reset:hover {
   color: #A0522D;
 }
 
+#btn-help.hidden,
 #btn-achievements.hidden,
 #btn-reset.hidden {
   display: none;
 }
 
+/* ---------- Painel de ajuda ---------- */
+#help-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(255, 245, 230, 0.92);
+  border-radius: 12px;
+  z-index: 40;
+}
+
+#help-panel.hidden {
+  display: none;
+}
+
+.help-card {
+  background: #FFFFFF;
+  border-radius: 16px;
+  padding: 22px 26px;
+  box-shadow: 0 8px 32px rgba(139, 69, 19, 0.25);
+  max-width: 380px;
+  width: 92%;
+  max-height: 85vh;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.help-card h2 {
+  font-size: 20px;
+  font-weight: 400;
+  color: #3E7CB1;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.help-section {
+  margin-bottom: 16px;
+}
+
+.help-section h3 {
+  font-size: 15px;
+  font-weight: 500;
+  color: #D2691E;
+  margin-bottom: 6px;
+}
+
+.help-section p {
+  font-size: 13px;
+  line-height: 1.55;
+  color: #5C2E0E;
+  margin-bottom: 6px;
+}
+
+.help-section ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.help-section li {
+  font-size: 13px;
+  line-height: 1.55;
+  color: #5C2E0E;
+  padding: 4px 0 4px 18px;
+  position: relative;
+}
+
+.help-section li::before {
+  content: '·';
+  position: absolute;
+  left: 6px;
+  color: #A0522D;
+  font-weight: bold;
+}
+
+.help-section strong {
+  color: #3E7CB1;
+  font-weight: 600;
+}
+
+#btn-close-help {
+  display: block;
+  margin: 8px auto 0;
+  font-family: inherit;
+  font-size: 14px;
+  color: #FFF5E6;
+  background: #D2691E;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  cursor: pointer;
+  transition: background 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+#btn-close-help:hover {
+  background: #B85A15;
+}
+
+/* ---------- Painel de conquistas ---------- */
 #achievements-panel {
   position: absolute;
   inset: 0;

@@ -2,8 +2,12 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#D2691E">
   <title>Desenrola</title>
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -45,10 +49,56 @@
     </div>
 
     <div id="menu-extras">
+      <button id="btn-help" type="button">❓ Ajuda</button>
       <button id="btn-achievements" type="button">🏆 Conquistas</button>
       <button id="btn-reset" type="button">Zerar progresso</button>
     </div>
 
+    <!-- Painel de ajuda -->
+    <div id="help-panel" class="hidden">
+      <div class="help-card">
+        <h2>Como jogar</h2>
+
+        <section class="help-section">
+          <h3>▤ Prateleira</h3>
+          <p>Arraste os objetos entre as prateleiras para que <strong>cada par de objetos iguais fique lado a lado</strong> na mesma prateleira.</p>
+          <ul>
+            <li>Um par só vale quando os dois objetos estão em <strong>slots vizinhos</strong>.</li>
+            <li>O traço azul embaixo mostra quando o par está formado.</li>
+            <li>⭐ <strong>Estrela</strong> e 🎁 <strong>Presente</strong> valem pontos extras.</li>
+            <li>Complete todos os pares antes do tempo acabar.</li>
+          </ul>
+        </section>
+
+        <section class="help-section">
+          <h3>〜 Fios</h3>
+          <p>Arraste os nós para <strong>desembaraçar os fios</strong> até que nenhum cruze com outro.</p>
+          <ul>
+            <li>Um fio fica <strong>azul brilhante</strong> quando não cruza mais com ninguém.</li>
+            <li>Complete todos os fios para vencer.</li>
+            <li>⚡ <strong>Fio elétrico</strong> vale pontos extras.</li>
+          </ul>
+        </section>
+
+        <section class="help-section">
+          <h3>🌿 Zen</h3>
+          <p>Modo relaxante, <strong>sem tempo e sem pontos</strong>. Escolhe uma mecânica aleatória e deixa você jogar no seu ritmo.</p>
+        </section>
+
+        <section class="help-section">
+          <h3>💡 Dicas</h3>
+          <ul>
+            <li>Botão 🔊 no topo liga/desliga o som.</li>
+            <li>O progresso é salvo automaticamente no celular.</li>
+            <li>Você pode jogar com o dedo ou com o mouse.</li>
+          </ul>
+        </section>
+
+        <button id="btn-close-help">Entendi</button>
+      </div>
+    </div>
+
+    <!-- Painel de conquistas -->
     <div id="achievements-panel" class="hidden">
       <div class="ach-card">
         <h2>Conquistas</h2>

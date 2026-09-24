@@ -1,10 +1,9 @@
 /* ============================================================
-   DESENROLA — Rodada E (Sons mais ricos)
+   DESENROLA — BACKUP 5 + Painel de Ajuda + Manifest PWA
    ------------------------------------------------------------
-   E1. Som de encaixe por família de objeto (grande/médio/pequeno).
-   E2. Tick de proximidade quando um objeto está perto do alvo.
-   E3. Sons específicos: presente (festivo), elétrico (zap).
-   E4. Botão de mudo no HUD com persistência.
+   Novidade desta versão:
+   - Botão "❓ Ajuda" no menu, abre painel com instruções.
+   - manifest.json + icon.svg para instalar como app no celular.
    ============================================================ */
 
 (function () {
@@ -66,7 +65,6 @@
       { id: 'ampulheta',palette: { color: '#E8C060', accent: '#D1A840' } },
     ],
 
-    /* E1 — família de cada tipo, define frequência do som de encaixe */
     OBJECT_FAMILY: {
       vaso: 'big', garrafa: 'big', pote: 'big', cilindro: 'big', cristal: 'big', ampulheta: 'big',
       frasco: 'mid', quadro: 'mid', caixa: 'mid', rolo: 'mid', cesta: 'mid',
@@ -119,9 +117,6 @@
     STORAGE_KEY: 'desenrola.progress.v1',
   };
 
-  // ----------------------------------------------------------
-  // DOM
-  // ----------------------------------------------------------
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
   const statusEl = document.getElementById('status');
@@ -133,6 +128,9 @@
   const btnThreads = document.getElementById('btn-threads');
   const btnZen = document.getElementById('btn-zen');
   const btnMute = document.getElementById('btn-mute');
+  const btnHelp = document.getElementById('btn-help');
+  const helpPanel = document.getElementById('help-panel');
+  const btnCloseHelp = document.getElementById('btn-close-help');
   const countShelf = document.getElementById('count-shelf');
   const countThreads = document.getElementById('count-threads');
   const btnReset = document.getElementById('btn-reset');
@@ -154,12 +152,8 @@
   const winTotal = document.getElementById('win-total');
   const btnNextLevel = document.getElementById('btn-next-level');
 
-  // ----------------------------------------------------------
-  // Persistência
-  // ----------------------------------------------------------
   const Progress = {
     data: { shelf: 0, threads: 0, score: 0, achievements: [], muted: false },
-
     load() {
       try {
         const raw = localStorage.getItem(CONFIG.STORAGE_KEY);
@@ -202,9 +196,6 @@
     },
   };
 
-  // ----------------------------------------------------------
-  // Conquistas
-  // ----------------------------------------------------------
   let toastTimeout = null;
   function showToast(icon, text) {
     toastIcon.textContent = icon;
@@ -251,12 +242,12 @@
   function openAchievements() { renderAchievements(); achPanel.classList.remove('hidden'); }
   function closeAchievements() { achPanel.classList.add('hidden'); }
 
-  // ----------------------------------------------------------
-  // Áudio (com mudo global)
-  // ----------------------------------------------------------
+  function openHelp() { helpPanel.classList.remove('hidden'); }
+  function closeHelp() { helpPanel.classList.add('hidden'); }
+
   let audioCtx = null;
   function ensureAudio() {
-    if (Progress.data.muted) return null;   // E4: respeita o mudo
+    if (Progress.data.muted) return null;
     if (!audioCtx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
@@ -265,8 +256,6 @@
     if (audioCtx.state === 'suspended') audioCtx.resume();
     return audioCtx;
   }
-
-  /** Toca uma nota simples com envelope. */
   function _tone(freq, duration, volume, type, startTime) {
     const c = ensureAudio(); if (!c) return;
     const t = startTime !== undefined ? startTime : c.currentTime;
@@ -282,21 +271,12 @@
     osc.connect(g); g.connect(c.destination);
     osc.start(t); osc.stop(t + d + 0.02);
   }
-
   function playSound(freq, duration) { _tone(freq, duration || 0.12, 0.25, 'sine'); }
-
-  /** E1 — som de encaixe por família. */
   function playSnapByFamily(family) {
     if (family === 'big') _tone(600, 0.14, 0.28, 'sine');
     else if (family === 'small') _tone(1000, 0.10, 0.22, 'sine');
     else _tone(800, 0.12, 0.25, 'sine');
   }
-
-  /** E2 — tick de proximidade (curto e suave). */
-  function playProximityTick() {
-    _tone(1500, 0.045, 0.10, 'sine');
-  }
-
   function playSlide() {
     const c = ensureAudio(); if (!c) return;
     const t = c.currentTime;
@@ -325,16 +305,12 @@
     const notes = [659.25, 987.77];
     notes.forEach((f, i) => _tone(f, 0.14, 0.22, 'sine', c.currentTime + i * 0.07));
   }
-
-  /** E3 — som festivo para presente (arpejo maior de 4 notas). */
   function playGiftSound() {
     const c = ensureAudio(); if (!c) return;
     const now = c.currentTime;
-    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5 E5 G5 C6
+    const notes = [523.25, 659.25, 783.99, 1046.50];
     notes.forEach((f, i) => _tone(f, 0.16, 0.20, 'sine', now + i * 0.07));
   }
-
-  /** E3 — som elétrico (zap) para fio elétrico. */
   function playElectricSound() {
     const c = ensureAudio(); if (!c) return;
     const now = c.currentTime;
@@ -348,13 +324,9 @@
     g.gain.exponentialRampToValueAtTime(0.0001, now + 0.20);
     osc.connect(g); g.connect(c.destination);
     osc.start(now); osc.stop(now + 0.22);
-    // Segunda camada: harmônico agudo
     _tone(1760, 0.10, 0.10, 'sine', now + 0.02);
   }
 
-  // ----------------------------------------------------------
-  // Utilidades
-  // ----------------------------------------------------------
   function dist(x1, y1, x2, y2) { return Math.hypot(x2 - x1, y2 - y1); }
   function lerp(a, b, t) { return a + (b - a) * t; }
   function cubicBezier(p0, p1, p2, p3, t) {
@@ -381,7 +353,6 @@
   function onSegment(ax, ay, bx, by, px, py) {
     return (Math.min(ax, bx) <= px && px <= Math.max(ax, bx) && Math.min(ay, by) <= py && py <= Math.max(ay, by));
   }
-
   function roundRect(x, y, w, h, r) {
     const rad = Math.min(r, w / 2, h / 2);
     ctx.beginPath();
@@ -626,11 +597,7 @@
     }
   }
 
-  // ----------------------------------------------------------
-  // Parâmetros de fase
-  // ----------------------------------------------------------
   let zenMode = false;
-
   function getShelfParams() {
     if (zenMode) {
       const base = CONFIG.ZEN_SHELF;
@@ -655,9 +622,6 @@
     return { level: idx + 1, zen: false, threadCount: base.threads, nodesPerThread: base.nodes, timeLimit };
   }
 
-  // ----------------------------------------------------------
-  // Estado global
-  // ----------------------------------------------------------
   let W = 0, H = 0;
   let currentScene = null;
   let lastTime = 0;
@@ -670,12 +634,9 @@
     complete: false, celebrationTimer: 0,
     params: null, _nextId: 1,
     timeLeft: 0, scoreThisPhase: 0, pairsFormed: 0, totalPairs: 0,
-    _prevPairs: new Set(),
-    _scoredPairs: new Set(),
+    _prevPairs: new Set(), _scoredPairs: new Set(),
     _statNormal: 0, _statStar: 0, _statGift: 0, _timeBonus: 0,
-    _pulseTime: 0,
-    _zen: false,
-    _lastProximityTick: 0,   // E2
+    _pulseTime: 0, _zen: false,
 
     reset() {
       this.params = getShelfParams();
@@ -688,8 +649,6 @@
       this.celebrationTimer = 0;
       this._nextId = 1;
       this._pulseTime = 0;
-      this._lastProximityTick = 0;
-
       this.timeLeft = this.params.timeLimit;
       this.scoreThisPhase = 0;
       this.pairsFormed = 0;
@@ -702,7 +661,6 @@
       const numShelves = this.params.shelves;
       const pairsPerShelf = this.params.pairs;
       const slotsPerShelf = this.params.slotsPerShelf;
-
       const topMargin = H * 0.26;
       const bottomMargin = H * 0.16;
       const usableH = H - topMargin - bottomMargin;
@@ -865,9 +823,7 @@
     _removeFromSlot(item) {
       for (let s = 0; s < this.shelves.length; s++) {
         const slots = this.shelves[s].slots;
-        for (let i = 0; i < slots.length; i++) {
-          if (slots[i] === item) slots[i] = null;
-        }
+        for (let i = 0; i < slots.length; i++) if (slots[i] === item) slots[i] = null;
       }
     },
     _placeInSlot(item, shelfIndex, slotIndex) {
@@ -885,12 +841,7 @@
       const fromShelfIndex = item.shelfIndex;
       const fromSlotIndex = item.slotIndex;
       this._removeFromSlot(item);
-      this.dragging = {
-        item,
-        offsetX: item.x - pos.x,
-        offsetY: item.y - pos.y,
-        fromShelfIndex, fromSlotIndex,
-      };
+      this.dragging = { item, offsetX: item.x - pos.x, offsetY: item.y - pos.y, fromShelfIndex, fromSlotIndex };
       const idx = this.items.indexOf(item);
       if (idx >= 0) { this.items.splice(idx, 1); this.items.push(item); }
       playSlide();
@@ -921,11 +872,7 @@
         }
       }
       const home = this._slotRect(fromShelf, fromSlot);
-      this.returning.push({
-        item: it, fromX: it.x, fromY: it.y,
-        toX: home.cx, toY: home.cy, t: 0,
-        homeShelfIndex: fromShelf, homeSlotIndex: fromSlot,
-      });
+      this.returning.push({ item: it, fromX: it.x, fromY: it.y, toX: home.cx, toY: home.cy, t: 0, homeShelfIndex: fromShelf, homeSlotIndex: fromSlot });
       playSound(300, 0.15);
     },
     _currentPairKeys() {
@@ -935,8 +882,7 @@
         const N = shelf.slots.length;
         let i = 0;
         while (i < N - 1) {
-          const a = shelf.slots[i];
-          const b = shelf.slots[i + 1];
+          const a = shelf.slots[i], b = shelf.slots[i + 1];
           if (a && b && a.pairId === b.pairId) { keys.add(`${s}:${a.pairId}`); i += 2; }
           else i++;
         }
@@ -956,21 +902,9 @@
             else if (kind === 'estrela') playBonus();
             else playSnapByFamily(family);
           } else {
-            if (kind === 'estrela') {
-              this.scoreThisPhase += CONFIG.POINTS_STAR;
-              this._statStar++;
-              playBonus();
-              tryUnlock('star');
-            } else if (kind === 'presente') {
-              this.scoreThisPhase += CONFIG.POINTS_GIFT;
-              this._statGift++;
-              playGiftSound();   // E3: som festivo
-              tryUnlock('gift');
-            } else {
-              this.scoreThisPhase += CONFIG.POINTS_NORMAL;
-              this._statNormal++;
-              playSnapByFamily(family);   // E1: som por família
-            }
+            if (kind === 'estrela') { this.scoreThisPhase += CONFIG.POINTS_STAR; this._statStar++; playBonus(); tryUnlock('star'); }
+            else if (kind === 'presente') { this.scoreThisPhase += CONFIG.POINTS_GIFT; this._statGift++; playGiftSound(); tryUnlock('gift'); }
+            else { this.scoreThisPhase += CONFIG.POINTS_NORMAL; this._statNormal++; playSnapByFamily(family); }
           }
           this.pairsFormed++;
           this._scoredPairs.add(key);
@@ -983,9 +917,7 @@
       return 'normal';
     },
     _findPairFamily(pairId) {
-      for (const it of this.items) {
-        if (it.pairId === pairId) return CONFIG.OBJECT_FAMILY[it.type] || 'mid';
-      }
+      for (const it of this.items) if (it.pairId === pairId) return CONFIG.OBJECT_FAMILY[it.type] || 'mid';
       return 'mid';
     },
     _isComplete() {
@@ -993,12 +925,10 @@
       for (const it of this.items) pairCount.set(it.pairId, (pairCount.get(it.pairId) || 0) + 1);
       for (const [, c] of pairCount) if (c !== 2) return false;
       const seen = new Set();
-      for (const shelf of this.shelves) {
-        for (const slot of shelf.slots) {
-          if (!slot) continue;
-          if (seen.has(slot)) return false;
-          seen.add(slot);
-        }
+      for (const shelf of this.shelves) for (const slot of shelf.slots) {
+        if (!slot) continue;
+        if (seen.has(slot)) return false;
+        seen.add(slot);
       }
       if (seen.size !== this.items.length) return false;
       for (let s = 0; s < this.shelves.length; s++) {
@@ -1007,8 +937,7 @@
         const N = shelf.slots.length;
         let i = 0;
         while (i < N - 1) {
-          const a = shelf.slots[i];
-          const b = shelf.slots[i + 1];
+          const a = shelf.slots[i], b = shelf.slots[i + 1];
           if (a && b && a.pairId === b.pairId) { paired.add(i); paired.add(i + 1); i += 2; }
           else i++;
         }
@@ -1135,8 +1064,7 @@
         const N2 = shelf.slots.length;
         let i = 0;
         while (i < N2 - 1) {
-          const a = shelf.slots[i];
-          const b = shelf.slots[i + 1];
+          const a = shelf.slots[i], b = shelf.slots[i + 1];
           if (a && b && a.pairId === b.pairId) {
             const key = `${s}:${a.pairId}`;
             const scored = this._scoredPairs.has(key);
@@ -1190,10 +1118,7 @@
     const usableH = H - 2 * margin;
     const leftY = margin + (usableH * (index + 1)) / (threadCount + 1);
     const rightY = margin + (usableH * (threadCount - index)) / (threadCount + 1);
-    const endpoints = [
-      { x: margin, y: leftY },
-      { x: W - margin, y: rightY },
-    ];
+    const endpoints = [{ x: margin, y: leftY }, { x: W - margin, y: rightY }];
     const nodes = [];
     for (let j = 0; j < nodesPerThread; j++) {
       const t = (j + 1) / (nodesPerThread + 1);
@@ -1225,14 +1150,12 @@
   }
 
   const ThreadsScene = {
-    threads: [], dragging: null,
-    complete: false, celebrationTimer: 0,
+    threads: [], dragging: null, complete: false, celebrationTimer: 0,
     params: { level: 1, threadCount: 3, nodesPerThread: 3, timeLimit: 60 },
     timeLeft: 0, scoreThisPhase: 0,
     _scoredThreads: new Set(),
     _statNormal: 0, _statElectric: 0, _timeBonus: 0,
-    _prevClean: new Set(),
-    _zen: false,
+    _prevClean: new Set(), _zen: false,
 
     reset() {
       this.params = getThreadsParams();
@@ -1262,7 +1185,6 @@
       this._updateCleanStates();
       this._prevClean = new Set(this.threads.map((t, i) => t.isClean ? i : -1).filter(i => i >= 0));
     },
-
     _updateCleanStates() {
       const N = this.threads.length;
       for (let i = 0; i < N; i++) {
@@ -1286,19 +1208,10 @@
         if (!this._prevClean.has(idx) && !this._scoredThreads.has(idx)) {
           const th = this.threads[idx];
           if (this._zen) {
-            if (th.isElectric) playElectricSound();
-            else playThreadClean();
+            if (th.isElectric) playElectricSound(); else playThreadClean();
           } else {
-            if (th.isElectric) {
-              this.scoreThisPhase += CONFIG.THREAD_POINTS_ELECTRIC;
-              this._statElectric++;
-              playElectricSound();   // E3: som elétrico
-              tryUnlock('electric');
-            } else {
-              this.scoreThisPhase += CONFIG.THREAD_POINTS_CLEAN;
-              this._statNormal++;
-              playThreadClean();
-            }
+            if (th.isElectric) { this.scoreThisPhase += CONFIG.THREAD_POINTS_ELECTRIC; this._statElectric++; playElectricSound(); tryUnlock('electric'); }
+            else { this.scoreThisPhase += CONFIG.THREAD_POINTS_CLEAN; this._statNormal++; playThreadClean(); }
           }
           th.cleanPulse = 600;
           this._scoredThreads.add(idx);
@@ -1509,9 +1422,6 @@
     },
   };
 
-  // ==========================================================
-  // LOOP E NAVEGAÇÃO
-  // ==========================================================
   function updateCurrentScene(dt) {
     if (currentScene === 'shelf') ShelfScene.update(dt);
     else if (currentScene === 'threads') ThreadsScene.update(dt);
@@ -1636,6 +1546,7 @@
       gameAreaEl.classList.add('hidden');
       btnReset.classList.remove('hidden');
       btnAchievements.classList.remove('hidden');
+      btnHelp.classList.remove('hidden');
       setStatus('Escolha uma mecânica', false);
       updateMenuCounters();
       updateMuteButton();
@@ -1648,6 +1559,7 @@
     gameAreaEl.classList.remove('hidden');
     btnReset.classList.add('hidden');
     btnAchievements.classList.add('hidden');
+    btnHelp.classList.add('hidden');
     const size = setupCanvas();
     W = size.width; H = size.height;
     currentScene = which;
@@ -1685,7 +1597,6 @@
   btnMute.addEventListener('click', () => {
     Progress.toggleMute();
     updateMuteButton();
-    // Se acabou de desmutar, toca um tiquinho pra confirmar
     if (!Progress.data.muted) _tone(700, 0.08, 0.15, 'sine');
   });
 
@@ -1719,6 +1630,8 @@
 
   btnAchievements.addEventListener('click', openAchievements);
   btnCloseAch.addEventListener('click', closeAchievements);
+  btnHelp.addEventListener('click', openHelp);
+  btnCloseHelp.addEventListener('click', closeHelp);
 
   function init() {
     Progress.load();

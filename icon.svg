@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Fundo creme quente -->
+  <rect width="512" height="512" rx="96" fill="#FFF5E6"/>
+
+  <!-- Prateleira de cima -->
+  <rect x="80" y="216" width="352" height="26" rx="6" fill="#D2691E"/>
+  <!-- Sombra da prateleira de cima -->
+  <rect x="88" y="238" width="336" height="6" rx="3" fill="rgba(139, 69, 19, 0.28)"/>
+
+  <!-- Objeto 1 — frasco (amarelo quente) -->
+  <rect x="120" y="144" width="56" height="72" rx="8" fill="#F4C28A" stroke="#5C2E0E" stroke-width="4"/>
+  <rect x="134" y="128" width="28" height="20" rx="4" fill="#F4C28A" stroke="#5C2E0E" stroke-width="4"/>
+  <rect x="132" y="172" width="32" height="14" rx="2" fill="#E0A566"/>
+
+  <!-- Objeto 2 — vaso (coral) -->
+  <path d="M 228 216 Q 228 168 244 148 L 276 148 Q 292 168 292 216 Z"
+        fill="#E8A87C" stroke="#5C2E0E" stroke-width="4" stroke-linejoin="round"/>
+  <ellipse cx="260" cy="148" rx="16" ry="6" fill="#D18F5F" stroke="#5C2E0E" stroke-width="3"/>
+
+  <!-- Objeto 3 — livro (azul) -->
+  <rect x="336" y="128" width="56" height="88" rx="6" fill="#9BB0D4" stroke="#5C2E0E" stroke-width="4"/>
+  <rect x="336" y="128" width="10" height="88" rx="4" fill="#7E94BA"/>
+
+  <!-- Prateleira de baixo -->
+  <rect x="80" y="366" width="352" height="26" rx="6" fill="#D2691E"/>
+  <rect x="88" y="388" width="336" height="6" rx="3" fill="rgba(139, 69, 19, 0.28)"/>
+
+  <!-- Objeto 4 — estrela (dourada) -->
+  <path d="M 152 288 L 164 320 L 198 320 L 170 340 L 180 372 L 152 352 L 124 372 L 134 340 L 106 320 L 140 320 Z"
+        fill="#FFD54F" stroke="#5C2E0E" stroke-width="4" stroke-linejoin="round"/>
+
+  <!-- Objeto 5 — presente (rosa) -->
+  <rect x="220" y="308" width="80" height="58" rx="6" fill="#F06292" stroke="#5C2E0E" stroke-width="4"/>
+  <rect x="212" y="296" width="96" height="18" rx="4" fill="#E91E63" stroke="#5C2E0E" stroke-width="3"/>
+  <rect x="252" y="296" width="16" height="70" fill="#E91E63"/>
+
+  <!-- Objeto 6 — prato (lilás) -->
+  <ellipse cx="380" cy="342" rx="44" ry="24" fill="#C79BC4" stroke="#5C2E0E" stroke-width="4"/>
+  <ellipse cx="380" cy="342" rx="26" ry="13" fill="none" stroke="#AD7EAA" stroke-width="3"/>
+</svg>
