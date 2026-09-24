@@ -1,11 +1,7 @@
 /* ============================================================
    DESENROLA — BACKUP 5 + Ajuda por jogo + Manifest PWA
-   ------------------------------------------------------------
-   Novidade desta versão:
-   - 3 manuais: geral (menu), Prateleira (dentro do jogo),
-     Fios (dentro do jogo).
-   - Botão "❓ Ajuda" dentro de cada jogo.
-   - Cada manual detalha os bônus e a pontuação específicos.
+   Correção: painéis começam escondidos via inline style,
+   e cada open/close gerencia o inline corretamente.
    ============================================================ */
 
 (function () {
@@ -130,9 +126,9 @@
   const btnThreads = document.getElementById('btn-threads');
   const btnZen = document.getElementById('btn-zen');
   const btnMute = document.getElementById('btn-mute');
-  const btnHelp = document.getElementById('btn-help');           // Ajuda no menu
-  const btnHelpGame = document.getElementById('btn-help-game'); // Ajuda dentro do jogo
-  const helpPanel = document.getElementById('help-panel');       // Ajuda geral
+  const btnHelp = document.getElementById('btn-help');
+  const btnHelpGame = document.getElementById('btn-help-game');
+  const helpPanel = document.getElementById('help-panel');
   const helpShelfPanel = document.getElementById('help-shelf-panel');
   const helpThreadsPanel = document.getElementById('help-threads-panel');
   const btnCloseHelp = document.getElementById('btn-close-help');
@@ -208,12 +204,16 @@
     toastIcon.textContent = icon;
     toastText.textContent = text;
     toast.classList.remove('hidden');
+    toast.style.display = 'flex';
     void toast.offsetWidth;
     toast.classList.add('visible');
     if (toastTimeout) clearTimeout(toastTimeout);
     toastTimeout = setTimeout(() => {
       toast.classList.remove('visible');
-      setTimeout(() => toast.classList.add('hidden'), 400);
+      setTimeout(() => {
+        toast.classList.add('hidden');
+        toast.style.display = 'none';
+      }, 400);
     }, 2600);
   }
   function tryUnlock(id) {
@@ -246,18 +246,41 @@
       achList.appendChild(li);
     }
   }
-  function openAchievements() { renderAchievements(); achPanel.classList.remove('hidden'); }
-  function closeAchievements() { achPanel.classList.add('hidden'); }
 
-  /* === Ajuda: 3 painéis diferentes === */
-  function openHelpGeneral() { helpPanel.classList.remove('hidden'); }
-  function closeHelpGeneral() { helpPanel.classList.add('hidden'); }
-  function openHelpShelf() { helpShelfPanel.classList.remove('hidden'); }
-  function closeHelpShelf() { helpShelfPanel.classList.add('hidden'); }
-  function openHelpThreads() { helpThreadsPanel.classList.remove('hidden'); }
-  function closeHelpThreads() { helpThreadsPanel.classList.add('hidden'); }
-
-  /** Abre o manual apropriado para a cena atual. */
+  /* === Ajuda: 3 painéis, com inline display para vencer cache === */
+  function openHelpGeneral() {
+    helpPanel.classList.remove('hidden');
+    helpPanel.style.display = 'flex';
+  }
+  function closeHelpGeneral() {
+    helpPanel.classList.add('hidden');
+    helpPanel.style.display = 'none';
+  }
+  function openHelpShelf() {
+    helpShelfPanel.classList.remove('hidden');
+    helpShelfPanel.style.display = 'flex';
+  }
+  function closeHelpShelf() {
+    helpShelfPanel.classList.add('hidden');
+    helpShelfPanel.style.display = 'none';
+  }
+  function openHelpThreads() {
+    helpThreadsPanel.classList.remove('hidden');
+    helpThreadsPanel.style.display = 'flex';
+  }
+  function closeHelpThreads() {
+    helpThreadsPanel.classList.add('hidden');
+    helpThreadsPanel.style.display = 'none';
+  }
+  function openAchievements() {
+    renderAchievements();
+    achPanel.classList.remove('hidden');
+    achPanel.style.display = 'flex';
+  }
+  function closeAchievements() {
+    achPanel.classList.add('hidden');
+    achPanel.style.display = 'none';
+  }
   function openContextHelp() {
     if (currentScene === 'shelf') openHelpShelf();
     else if (currentScene === 'threads') openHelpThreads();
@@ -425,9 +448,7 @@
     }, 200);
   }
 
-  /* ==========================================================
-     DESENHOS DOS OBJETOS
-     ========================================================== */
+  /* ---- Desenhos dos objetos ---- */
   function drawFrasco(w, h, fill, accent) {
     ctx.fillStyle = fill;
     ctx.beginPath();
@@ -650,9 +671,7 @@
   let currentScene = null;
   let lastTime = 0;
 
-  /* ==========================================================
-     CENA: PRATELEIRA
-     ========================================================== */
+  /* CENA: PRATELEIRA */
   const ShelfScene = {
     shelves: [], items: [], dragging: null, returning: [],
     complete: false, celebrationTimer: 0,
@@ -782,7 +801,6 @@
       this._prevPairs = this._currentPairKeys();
       this._scoredPairs = new Set();
     },
-
     _swapItems(a, b) {
       const aShelf = a.shelfIndex, aSlot = a.slotIndex;
       const bShelf = b.shelfIndex, bSlot = b.slotIndex;
@@ -999,6 +1017,7 @@
       winBreakdown.innerHTML = lines.join('<br>');
       winTotal.textContent = `Total: ${Progress.data.score} pontos`;
       winOverlay.classList.remove('hidden');
+      winOverlay.style.display = 'flex';
       void winOverlay.offsetWidth;
       winOverlay.classList.add('visible');
     },
@@ -1133,9 +1152,7 @@
     },
   };
 
-  /* ==========================================================
-     CENA: FIOS
-     ========================================================== */
+  /* CENA: FIOS */
   function createThread(index, color, threadCount, nodesPerThread, isElectric) {
     const margin = CONFIG.THREAD_MARGIN;
     const usableW = W - 2 * margin;
@@ -1428,6 +1445,7 @@
       winBreakdown.innerHTML = lines.join('<br>');
       winTotal.textContent = `Total: ${Progress.data.score} pontos`;
       winOverlay.classList.remove('hidden');
+      winOverlay.style.display = 'flex';
       void winOverlay.offsetWidth;
       winOverlay.classList.add('visible');
     },
@@ -1560,6 +1578,7 @@
   function hideWinOverlay() {
     winOverlay.classList.remove('visible');
     winOverlay.classList.add('hidden');
+    winOverlay.style.display = 'none';
   }
   function showMenu() {
     hideWinOverlay();
@@ -1654,7 +1673,6 @@
     setStatus('Progresso zerado', false);
   });
 
-  /* === Botões de Ajuda === */
   btnHelp.addEventListener('click', openHelpGeneral);
   btnCloseHelp.addEventListener('click', closeHelpGeneral);
 
@@ -1669,13 +1687,16 @@
     Progress.load();
     updateMuteButton();
 
-    // Garante que todos os painéis começam escondidos (à prova de cache)
-    helpPanel.classList.add('hidden');
-    helpShelfPanel.classList.add('hidden');
-    helpThreadsPanel.classList.add('hidden');
-    achPanel.classList.add('hidden');
-    winOverlay.classList.add('hidden');
+    // Garante que TODOS os painéis/overlays começam escondidos.
+    // Usa tanto a classe .hidden quanto display inline — o inline
+    // vence qualquer CSS que esteja em cache no navegador.
+    const allPanels = [helpPanel, helpShelfPanel, helpThreadsPanel, achPanel, winOverlay, toast];
+    for (const p of allPanels) {
+      p.classList.add('hidden');
+      p.style.display = 'none';
+    }
     winOverlay.classList.remove('visible');
+    toast.classList.remove('visible');
 
     const size = setupCanvas();
     W = size.width; H = size.height;

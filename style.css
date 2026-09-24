@@ -4,6 +4,14 @@
   box-sizing: border-box;
 }
 
+/* ============================================================
+   REGRA GLOBAL: qualquer elemento com .hidden fica escondido.
+   Usa !important para vencer qualquer display herdado.
+   ============================================================ */
+.hidden {
+  display: none !important;
+}
+
 body {
   background: #FFF5E6;
   color: #5C2E0E;
@@ -55,10 +63,6 @@ h1 {
   display: block;
 }
 
-#game-area.hidden {
-  display: none !important;
-}
-
 #hud {
   display: flex;
   justify-content: center;
@@ -78,10 +82,6 @@ h1 {
   letter-spacing: 0.3px;
   transition: opacity 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94),
               background 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
-}
-
-.hud-item.hidden {
-  display: none !important;
 }
 
 .hud-item.danger {
@@ -203,10 +203,6 @@ h1 {
   flex-wrap: wrap;
 }
 
-#menu.hidden {
-  display: none !important;
-}
-
 .menu-btn {
   display: flex;
   flex-direction: column;
@@ -309,12 +305,6 @@ h1 {
   color: #A0522D;
 }
 
-#btn-help.hidden,
-#btn-achievements.hidden,
-#btn-reset.hidden {
-  display: none !important;
-}
-
 /* ============================================================
    PAINÉIS MODAIS (Ajuda geral, Ajuda Prateleira, Ajuda Fios,
    Conquistas)
@@ -336,6 +326,7 @@ h1 {
   padding: 20px;
 }
 
+/* Redundância: garante escondido mesmo se a global for sobrescrita */
 #help-panel.hidden,
 #help-shelf-panel.hidden,
 #help-threads-panel.hidden,
@@ -474,7 +465,6 @@ h1 {
   pointer-events: none;
 }
 
-#toast.hidden { display: none !important; }
 #toast.visible { transform: translateY(0); opacity: 1; }
 #toast-icon { font-size: 24px; line-height: 1; }
 #toast-text { max-width: 220px; }
@@ -493,7 +483,6 @@ h1 {
   z-index: 20;
 }
 
-#win-overlay.hidden { display: none !important; }
 #win-overlay.visible { opacity: 1; pointer-events: auto; }
 
 .win-card {
