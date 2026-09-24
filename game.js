@@ -1,6 +1,11 @@
 /* ============================================================
-   DESENROLA — BACKUP 5 + Painel de Ajuda + Manifest PWA
-   Correção: painéis começam escondidos mesmo com cache agressivo.
+   DESENROLA — BACKUP 5 + Ajuda por jogo + Manifest PWA
+   ------------------------------------------------------------
+   Novidade desta versão:
+   - 3 manuais: geral (menu), Prateleira (dentro do jogo),
+     Fios (dentro do jogo).
+   - Botão "❓ Ajuda" dentro de cada jogo.
+   - Cada manual detalha os bônus e a pontuação específicos.
    ============================================================ */
 
 (function () {
@@ -125,9 +130,14 @@
   const btnThreads = document.getElementById('btn-threads');
   const btnZen = document.getElementById('btn-zen');
   const btnMute = document.getElementById('btn-mute');
-  const btnHelp = document.getElementById('btn-help');
-  const helpPanel = document.getElementById('help-panel');
+  const btnHelp = document.getElementById('btn-help');           // Ajuda no menu
+  const btnHelpGame = document.getElementById('btn-help-game'); // Ajuda dentro do jogo
+  const helpPanel = document.getElementById('help-panel');       // Ajuda geral
+  const helpShelfPanel = document.getElementById('help-shelf-panel');
+  const helpThreadsPanel = document.getElementById('help-threads-panel');
   const btnCloseHelp = document.getElementById('btn-close-help');
+  const btnCloseHelpShelf = document.getElementById('btn-close-help-shelf');
+  const btnCloseHelpThreads = document.getElementById('btn-close-help-threads');
   const countShelf = document.getElementById('count-shelf');
   const countThreads = document.getElementById('count-threads');
   const btnReset = document.getElementById('btn-reset');
@@ -239,8 +249,25 @@
   function openAchievements() { renderAchievements(); achPanel.classList.remove('hidden'); }
   function closeAchievements() { achPanel.classList.add('hidden'); }
 
-  function openHelp() { helpPanel.classList.remove('hidden'); }
-  function closeHelp() { helpPanel.classList.add('hidden'); }
+  /* === Ajuda: 3 painéis diferentes === */
+  function openHelpGeneral() { helpPanel.classList.remove('hidden'); }
+  function closeHelpGeneral() { helpPanel.classList.add('hidden'); }
+  function openHelpShelf() { helpShelfPanel.classList.remove('hidden'); }
+  function closeHelpShelf() { helpShelfPanel.classList.add('hidden'); }
+  function openHelpThreads() { helpThreadsPanel.classList.remove('hidden'); }
+  function closeHelpThreads() { helpThreadsPanel.classList.add('hidden'); }
+
+  /** Abre o manual apropriado para a cena atual. */
+  function openContextHelp() {
+    if (currentScene === 'shelf') openHelpShelf();
+    else if (currentScene === 'threads') openHelpThreads();
+    else openHelpGeneral();
+  }
+  function closeAllHelps() {
+    closeHelpGeneral();
+    closeHelpShelf();
+    closeHelpThreads();
+  }
 
   let audioCtx = null;
   function ensureAudio() {
@@ -1536,6 +1563,7 @@
   }
   function showMenu() {
     hideWinOverlay();
+    closeAllHelps();
     zenMode = false;
     fadeCanvas(() => {
       currentScene = null;
@@ -1551,6 +1579,7 @@
   }
   function showGame(which, isZen) {
     hideWinOverlay();
+    closeAllHelps();
     zenMode = !!isZen;
     menuEl.classList.add('hidden');
     gameAreaEl.classList.remove('hidden');
@@ -1625,17 +1654,25 @@
     setStatus('Progresso zerado', false);
   });
 
+  /* === Botões de Ajuda === */
+  btnHelp.addEventListener('click', openHelpGeneral);
+  btnCloseHelp.addEventListener('click', closeHelpGeneral);
+
+  btnHelpGame.addEventListener('click', openContextHelp);
+  btnCloseHelpShelf.addEventListener('click', closeHelpShelf);
+  btnCloseHelpThreads.addEventListener('click', closeHelpThreads);
+
   btnAchievements.addEventListener('click', openAchievements);
   btnCloseAch.addEventListener('click', closeAchievements);
-  btnHelp.addEventListener('click', openHelp);
-  btnCloseHelp.addEventListener('click', closeHelp);
 
   function init() {
     Progress.load();
     updateMuteButton();
 
-    // Garante que painéis e overlay começam escondidos (à prova de cache)
+    // Garante que todos os painéis começam escondidos (à prova de cache)
     helpPanel.classList.add('hidden');
+    helpShelfPanel.classList.add('hidden');
+    helpThreadsPanel.classList.add('hidden');
     achPanel.classList.add('hidden');
     winOverlay.classList.add('hidden');
     winOverlay.classList.remove('visible');

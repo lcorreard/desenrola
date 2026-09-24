@@ -144,11 +144,12 @@ h1 {
 }
 
 #btn-new,
+#btn-help-game,
 #btn-menu {
   font-family: inherit;
   font-size: 14px;
   border-radius: 8px;
-  padding: 10px 24px;
+  padding: 10px 18px;
   cursor: pointer;
   transition: background 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94),
               transform 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94),
@@ -167,6 +168,16 @@ h1 {
   box-shadow: 0 4px 12px rgba(210, 105, 30, 0.30);
 }
 
+#btn-help-game {
+  color: #3E7CB1;
+  background: rgba(62, 124, 177, 0.10);
+  border: 1.5px solid rgba(62, 124, 177, 0.35);
+}
+
+#btn-help-game:hover {
+  background: rgba(62, 124, 177, 0.18);
+}
+
 #btn-menu {
   color: #D2691E;
   background: transparent;
@@ -179,6 +190,7 @@ h1 {
 }
 
 #btn-new:active,
+#btn-help-game:active,
 #btn-menu:active {
   transform: scale(0.97);
 }
@@ -304,10 +316,13 @@ h1 {
 }
 
 /* ============================================================
-   PAINÉIS MODAIS (Ajuda e Conquistas)
+   PAINÉIS MODAIS (Ajuda geral, Ajuda Prateleira, Ajuda Fios,
+   Conquistas)
    ============================================================ */
 
 #help-panel,
+#help-shelf-panel,
+#help-threads-panel,
 #achievements-panel {
   position: fixed;
   inset: 0;
@@ -321,8 +336,9 @@ h1 {
   padding: 20px;
 }
 
-/* Regra crítica: esconde os painéis quando têm .hidden */
 #help-panel.hidden,
+#help-shelf-panel.hidden,
+#help-threads-panel.hidden,
 #achievements-panel.hidden {
   display: none !important;
 }
@@ -347,7 +363,7 @@ h1 {
   }
 }
 
-.help-card { max-width: 380px; }
+.help-card { max-width: 400px; }
 .ach-card { max-width: 340px; }
 
 .help-card h2,
@@ -389,10 +405,19 @@ h1 {
 }
 .help-section strong { color: #3E7CB1; font-weight: 600; }
 
-#btn-close-help,
-#btn-close-ach {
+.help-hint {
+  font-size: 12px;
+  color: #A0522D;
+  text-align: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(210, 105, 30, 0.18);
+  line-height: 1.5;
+}
+
+.btn-close-panel {
   display: block;
-  margin: 8px auto 0;
+  margin: 12px auto 0;
   font-family: inherit;
   font-size: 14px;
   color: #FFF5E6;
@@ -404,8 +429,9 @@ h1 {
   transition: background 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
-#btn-close-help:hover,
-#btn-close-ach:hover { background: #B85A15; }
+.btn-close-panel:hover {
+  background: #B85A15;
+}
 
 #ach-list { list-style: none; padding: 0; margin-bottom: 16px; }
 #ach-list li {
@@ -448,23 +474,10 @@ h1 {
   pointer-events: none;
 }
 
-#toast.hidden {
-  display: none !important;
-}
-
-#toast.visible {
-  transform: translateY(0);
-  opacity: 1;
-}
-
-#toast-icon {
-  font-size: 24px;
-  line-height: 1;
-}
-
-#toast-text {
-  max-width: 220px;
-}
+#toast.hidden { display: none !important; }
+#toast.visible { transform: translateY(0); opacity: 1; }
+#toast-icon { font-size: 24px; line-height: 1; }
+#toast-text { max-width: 220px; }
 
 #win-overlay {
   position: absolute;
@@ -480,14 +493,8 @@ h1 {
   z-index: 20;
 }
 
-#win-overlay.hidden {
-  display: none !important;
-}
-
-#win-overlay.visible {
-  opacity: 1;
-  pointer-events: auto;
-}
+#win-overlay.hidden { display: none !important; }
+#win-overlay.visible { opacity: 1; pointer-events: auto; }
 
 .win-card {
   background: #FFFFFF;
@@ -563,6 +570,4 @@ h1 {
   box-shadow: 0 2px 6px rgba(210, 105, 30, 0.25);
 }
 
-.win-card.zen h2 {
-  color: #E91E63;
-}
+.win-card.zen h2 { color: #E91E63; }
