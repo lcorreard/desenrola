@@ -1,7 +1,11 @@
 /* ============================================================
-   DESENROLA — BACKUP 5 + Ajuda por jogo + Manifest PWA
-   Correção: painéis começam escondidos via inline style,
-   e cada open/close gerencia o inline corretamente.
+   DESENROLA — BACKUP 6 + Som ambiente via arquivo MP3
+   ------------------------------------------------------------
+   Novidade desta versão:
+   - AmbientPlayer agora toca 'ambient.mp3' em loop.
+   - Fade-in de 2.5s ao iniciar (volume 0 → 0.35).
+   - Fade-out de 0.8s ao parar.
+   - Continua respeitando o mute geral (🔊) e o toggle do botão 🌊.
    ============================================================ */
 
 (function () {
@@ -101,6 +105,17 @@
     CELEBRATION_DURATION: 1000,
     RETURN_DURATION: 300,
 
+    /* === Som ambiente (agora via arquivo mp3) === */
+    AMBIENT: {
+      // Caminho do arquivo de áudio (deve estar na mesma pasta do index.html)
+      SRC: 'ambient.mp3',
+      // Volume final (0..1). 0.35 é discreto mas audível.
+      VOLUME: 0.35,
+      // Fade-in ao iniciar / fade-out ao parar (ms)
+      FADE_IN_MS: 2500,
+      FADE_OUT_MS: 800,
+    },
+
     ACHIEVEMENTS: [
       { id: 'first_shelf',   icon: '▤', name: 'Primeira prateleira',  desc: 'Complete 1 prateleira' },
       { id: 'first_thread',  icon: '〜', name: 'Primeiro fio',         desc: 'Complete 1 fase de fios' },
@@ -126,6 +141,7 @@
   const btnThreads = document.getElementById('btn-threads');
   const btnZen = document.getElementById('btn-zen');
   const btnMute = document.getElementById('btn-mute');
+  const btnAmbient = document.getElementById('btn-ambient');
   const btnHelp = document.getElementById('btn-help');
   const btnHelpGame = document.getElementById('btn-help-game');
   const helpPanel = document.getElementById('help-panel');
@@ -156,7 +172,7 @@
   const btnNextLevel = document.getElementById('btn-next-level');
 
   const Progress = {
-    data: { shelf: 0, threads: 0, score: 0, achievements: [], muted: false },
+    data: { shelf: 0, threads: 0, score: 0, achievements: [], muted: false, ambient: true },
     load() {
       try {
         const raw = localStorage.getItem(CONFIG.STORAGE_KEY);
@@ -168,10 +184,11 @@
             this.data.score = Number(parsed.score) || 0;
             this.data.achievements = Array.isArray(parsed.achievements) ? parsed.achievements : [];
             this.data.muted = !!parsed.muted;
+            this.data.ambient = parsed.ambient === undefined ? true : !!parsed.ambient;
           }
         }
       } catch (e) {
-        this.data = { shelf: 0, threads: 0, score: 0, achievements: [], muted: false };
+        this.data = { shelf: 0, threads: 0, score: 0, achievements: [], muted: false, ambient: true };
       }
     },
     save() {
@@ -182,7 +199,7 @@
     },
     addScore(points) { this.data.score += points; this.save(); },
     reset() {
-      this.data = { shelf: 0, threads: 0, score: 0, achievements: [], muted: this.data.muted };
+      this.data = { shelf: 0, threads: 0, score: 0, achievements: [], muted: this.data.muted, ambient: this.data.ambient };
       try { localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(this.data)); } catch (e) {}
     },
     hasAchievement(id) { return this.data.achievements.indexOf(id) >= 0; },
@@ -196,6 +213,11 @@
       this.data.muted = !this.data.muted;
       this.save();
       return this.data.muted;
+    },
+    toggleAmbient() {
+      this.data.ambient = !this.data.ambient;
+      this.save();
+      return this.data.ambient;
     },
   };
 
@@ -246,8 +268,6 @@
       achList.appendChild(li);
     }
   }
-
-  /* === Ajuda: 3 painéis, com inline display para vencer cache === */
   function openHelpGeneral() {
     helpPanel.classList.remove('hidden');
     helpPanel.style.display = 'flex';
@@ -292,6 +312,10 @@
     closeHelpThreads();
   }
 
+  /* ============================================================
+     ÁUDIO — Efeitos (sintetizados) + Ambiente (arquivo MP3)
+     ============================================================ */
+
   let audioCtx = null;
   function ensureAudio() {
     if (Progress.data.muted) return null;
@@ -303,6 +327,7 @@
     if (audioCtx.state === 'suspended') audioCtx.resume();
     return audioCtx;
   }
+
   function _tone(freq, duration, volume, type, startTime) {
     const c = ensureAudio(); if (!c) return;
     const t = startTime !== undefined ? startTime : c.currentTime;
@@ -373,6 +398,97 @@
     osc.start(now); osc.stop(now + 0.22);
     _tone(1760, 0.10, 0.10, 'sine', now + 0.02);
   }
+
+  /* ------------------------------------------------------------
+     AmbientPlayer — toca 'ambient.mp3' em loop
+     ------------------------------------------------------------
+     - Cria um elemento <audio> na primeira chamada de start().
+     - Volume inicia em 0 e sobe suavemente até VOLUME.
+     - Ao parar, desce suavemente até 0 e depois pausa.
+     - Respeita o mute geral e o toggle do botão 🌊.
+     ------------------------------------------------------------ */
+  class AmbientPlayer {
+    constructor() {
+      this.audio = null;
+      this.playing = false;
+      this._fadeRaf = null;
+    }
+
+    start() {
+      if (this.playing) return;
+
+      // Cria o elemento na primeira vez
+      if (!this.audio) {
+        try {
+          this.audio = new Audio(CONFIG.AMBIENT.SRC);
+          this.audio.loop = true;
+          this.audio.preload = 'auto';
+          this.audio.volume = 0;
+        } catch (e) {
+          return; // falha silenciosa
+        }
+      }
+
+      // play() retorna uma Promise que pode rejeitar se o navegador
+      // bloquear antes de interação do usuário. Ignoramos.
+      const p = this.audio.play();
+      if (p && typeof p.then === 'function') {
+        p.then(() => {
+          this.playing = true;
+          this._fadeTo(CONFIG.AMBIENT.VOLUME, CONFIG.AMBIENT.FADE_IN_MS);
+        }).catch(() => {
+          // Bloqueado. Não marca como playing.
+        });
+      } else {
+        this.playing = true;
+        this._fadeTo(CONFIG.AMBIENT.VOLUME, CONFIG.AMBIENT.FADE_IN_MS);
+      }
+    }
+
+    stop() {
+      if (!this.audio || !this.playing) return;
+      this._fadeTo(0, CONFIG.AMBIENT.FADE_OUT_MS, () => {
+        try { this.audio.pause(); } catch (e) {}
+        this.playing = false;
+      });
+    }
+
+    _fadeTo(target, durationMs, onDone) {
+      if (!this.audio) return;
+      if (this._fadeRaf) cancelAnimationFrame(this._fadeRaf);
+
+      const startVol = this.audio.volume;
+      const startTime = performance.now();
+
+      const step = (now) => {
+        const t = Math.min(1, (now - startTime) / durationMs);
+        // ease-in-out
+        const eased = t < 0.5
+          ? 2 * t * t
+          : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        const v = startVol + (target - startVol) * eased;
+        try { this.audio.volume = Math.max(0, Math.min(1, v)); } catch (e) {}
+        if (t < 1) {
+          this._fadeRaf = requestAnimationFrame(step);
+        } else {
+          this._fadeRaf = null;
+          if (onDone) onDone();
+        }
+      };
+      this._fadeRaf = requestAnimationFrame(step);
+    }
+
+    refresh(inGame) {
+      const shouldPlay =
+        inGame &&
+        Progress.data.ambient &&
+        !Progress.data.muted;
+      if (shouldPlay) this.start();
+      else this.stop();
+    }
+  }
+
+  const ambient = new AmbientPlayer();
 
   function dist(x1, y1, x2, y2) { return Math.hypot(x2 - x1, y2 - y1); }
   function lerp(a, b, t) { return a + (b - a) * t; }
@@ -448,7 +564,7 @@
     }, 200);
   }
 
-  /* ---- Desenhos dos objetos ---- */
+  /* Desenhos dos objetos */
   function drawFrasco(w, h, fill, accent) {
     ctx.fillStyle = fill;
     ctx.beginPath();
@@ -1571,6 +1687,13 @@
   function updateMuteButton() {
     btnMute.textContent = Progress.data.muted ? '🔇' : '🔊';
   }
+  function updateAmbientButton() {
+    btnAmbient.classList.toggle('on', Progress.data.ambient);
+    btnAmbient.classList.toggle('off', !Progress.data.ambient);
+    btnAmbient.title = Progress.data.ambient
+      ? 'Som ambiente ligado — clique para desligar'
+      : 'Som ambiente desligado — clique para ligar';
+  }
   function fadeCanvas(callback) {
     canvas.classList.add('fading');
     setTimeout(() => { callback(); canvas.classList.remove('fading'); }, 200);
@@ -1594,7 +1717,9 @@
       setStatus('Escolha uma mecânica', false);
       updateMenuCounters();
       updateMuteButton();
+      updateAmbientButton();
     });
+    ambient.refresh(false);
   }
   function showGame(which, isZen) {
     hideWinOverlay();
@@ -1618,6 +1743,8 @@
       setStatus(zenMode ? 'Zen 🌿' : 'Arraste os nós até nenhum fio se cruzar', false);
     }
     updateMuteButton();
+    updateAmbientButton();
+    ambient.refresh(true);
     canvas.classList.add('fading');
     requestAnimationFrame(() => { requestAnimationFrame(() => canvas.classList.remove('fading')); });
   }
@@ -1643,6 +1770,14 @@
     Progress.toggleMute();
     updateMuteButton();
     if (!Progress.data.muted) _tone(700, 0.08, 0.15, 'sine');
+    ambient.refresh(currentScene !== null);
+  });
+
+  btnAmbient.addEventListener('click', () => {
+    Progress.toggleAmbient();
+    updateAmbientButton();
+    ambient.refresh(currentScene !== null);
+    if (!Progress.data.muted) _tone(Progress.data.ambient ? 880 : 520, 0.08, 0.12, 'sine');
   });
 
   btnNew.addEventListener('click', () => {
@@ -1670,6 +1805,7 @@
     Progress.reset();
     updateMenuCounters();
     updateMuteButton();
+    updateAmbientButton();
     setStatus('Progresso zerado', false);
   });
 
@@ -1686,10 +1822,8 @@
   function init() {
     Progress.load();
     updateMuteButton();
+    updateAmbientButton();
 
-    // Garante que TODOS os painéis/overlays começam escondidos.
-    // Usa tanto a classe .hidden quanto display inline — o inline
-    // vence qualquer CSS que esteja em cache no navegador.
     const allPanels = [helpPanel, helpShelfPanel, helpThreadsPanel, achPanel, winOverlay, toast];
     for (const p of allPanels) {
       p.classList.add('hidden');
@@ -1737,6 +1871,15 @@
         }
       }
     });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        ambient.stop();
+      } else {
+        ambient.refresh(currentScene !== null);
+      }
+    });
+
     showMenu();
     requestAnimationFrame(loop);
   }

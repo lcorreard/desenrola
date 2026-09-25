@@ -4,10 +4,6 @@
   box-sizing: border-box;
 }
 
-/* ============================================================
-   REGRA GLOBAL: qualquer elemento com .hidden fica escondido.
-   Usa !important para vencer qualquer display herdado.
-   ============================================================ */
 .hidden {
   display: none !important;
 }
@@ -89,6 +85,8 @@ h1 {
   background: rgba(211, 47, 47, 0.12);
 }
 
+/* Botões redondos do HUD (ambiente e mute) */
+#btn-ambient,
 #btn-mute {
   font-family: inherit;
   font-size: 14px;
@@ -102,16 +100,28 @@ h1 {
   border: none;
   cursor: pointer;
   transition: background 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94),
-              transform 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+              transform 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              color 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
   -webkit-tap-highlight-color: transparent;
 }
 
+#btn-ambient:hover,
 #btn-mute:hover {
   background: rgba(210, 105, 30, 0.20);
 }
 
+#btn-ambient:active,
 #btn-mute:active {
   transform: scale(0.92);
+}
+
+/* Estado "ligado" do ambiente: ícone azul */
+#btn-ambient.on {
+  color: #3E7CB1;
+}
+
+#btn-ambient.off {
+  color: #C9A88C;
 }
 
 #canvas {
@@ -305,11 +315,6 @@ h1 {
   color: #A0522D;
 }
 
-/* ============================================================
-   PAINÉIS MODAIS (Ajuda geral, Ajuda Prateleira, Ajuda Fios,
-   Conquistas)
-   ============================================================ */
-
 #help-panel,
 #help-shelf-panel,
 #help-threads-panel,
@@ -326,7 +331,6 @@ h1 {
   padding: 20px;
 }
 
-/* Redundância: garante escondido mesmo se a global for sobrescrita */
 #help-panel.hidden,
 #help-shelf-panel.hidden,
 #help-threads-panel.hidden,
