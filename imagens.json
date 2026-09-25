@@ -19,37 +19,37 @@
       ]
     },
     {
-      "id": "comidas",
-      "nome": "Comidas",
+      "id": "comida",
+      "nome": "Comida",
       "emoji": "🍽",
       "imagens": [
-        "imagens/Comidas/abacate.svg",
-        "imagens/Comidas/bife.svg",
-        "imagens/Comidas/cereja.svg",
-        "imagens/Comidas/laranja.svg",
-        "imagens/Comidas/limao.svg",
-        "imagens/Comidas/maca.svg",
-        "imagens/Comidas/melancia.svg",
-        "imagens/Comidas/ovo.svg",
-        "imagens/Comidas/peixe.svg",
-        "imagens/Comidas/uva.svg"
+        "imagens/Comida/abacate.svg",
+        "imagens/Comida/bife.svg",
+        "imagens/Comida/cereja.svg",
+        "imagens/Comida/laranja.svg",
+        "imagens/Comida/limao.svg",
+        "imagens/Comida/maca.svg",
+        "imagens/Comida/melancia.svg",
+        "imagens/Comida/ovo.svg",
+        "imagens/Comida/peixe.svg",
+        "imagens/Comida/uva.svg"
       ]
     },
     {
-      "id": "empresas",
-      "nome": "Empresas",
+      "id": "empresa",
+      "nome": "Empresa",
       "emoji": "🏢",
       "imagens": [
-        "imagens/Empresas/amazon.svg",
-        "imagens/Empresas/apple.svg",
-        "imagens/Empresas/drive.svg",
-        "imagens/Empresas/dropbox.svg",
-        "imagens/Empresas/facebook.svg",
-        "imagens/Empresas/firefox.svg",
-        "imagens/Empresas/google.svg",
-        "imagens/Empresas/linkedin.svg",
-        "imagens/Empresas/flip.svg",
-        "imagens/Empresas/twitter.svg"
+        "imagens/Empresa/amazon.svg",
+        "imagens/Empresa/apple.svg",
+        "imagens/Empresa/drive.svg",
+        "imagens/Empresa/dropbox.svg",
+        "imagens/Empresa/facebook.svg",
+        "imagens/Empresa/firefox.svg",
+        "imagens/Empresa/google.svg",
+        "imagens/Empresa/linkedin.svg",
+        "imagens/Empresa/flip.svg",
+        "imagens/Empresa/twitter.svg"
       ]
     },
     {
@@ -70,20 +70,20 @@
       ]
     },
     {
-      "id": "musicas",
-      "nome": "Musicas",
+      "id": "musica",
+      "nome": "Musica",
       "emoji": "🎵",
       "imagens": [
-        "imagens/Musicas/arcodeon.svg",
-        "imagens/Musicas/bateria.svg",
-        "imagens/Musicas/gaita.svg",
-        "imagens/Musicas/guitarra.svg",
-        "imagens/Musicas/teclado.svg",
-        "imagens/Musicas/violino.svg",
-        "imagens/Musicas/trompete.svg",
-        "imagens/Musicas/piano.svg",
-        "imagens/Musicas/saxofone.svg",
-        "imagens/Musicas/tambor.svg"
+        "imagens/Musica/arcodeon.svg",
+        "imagens/Musica/bateria.svg",
+        "imagens/Musica/gaita.svg",
+        "imagens/Musica/guitarra.svg",
+        "imagens/Musica/teclado.svg",
+        "imagens/Musica/violino.svg",
+        "imagens/Musica/trompete.svg",
+        "imagens/Musica/piano.svg",
+        "imagens/Musica/saxofone.svg",
+        "imagens/Musica/tambor.svg"
       ]
     },
     {
