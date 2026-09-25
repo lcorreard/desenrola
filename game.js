@@ -1,21 +1,31 @@
 /* ============================================================
-   DESENROLA — BACKUP 6 + Som ambiente + Compartilhar + Desafio Diário
+   DESENROLA — Com imagens reais (Prateleira + Gaveta)
    ------------------------------------------------------------
-   Novidade desta versão:
-   - Botão "🎯 Desafio do dia" no menu (linha própria).
-   - Fase determinística por data (mesma para todos).
-   - 3 tentativas por dia, melhor pontuação conta.
-   - Streak de dias consecutivos.
-   - Histórico dos últimos 7 desafios (painel "🎯 Desafios").
-   - 3 conquistas novas (primeiro/três/semana).
-   - Compartilhamento específico do desafio.
+   Novidades desta versão:
+   - ImageLoader: carrega imagens.json + todas as imagens em paralelo.
+   - Prateleira: cada par = 2 imagens iguais do mesmo tema sorteado.
+   - Gaveta: cada gaveta = um tema; imagens classificadas por tema.
+   - Tela de loading até as imagens carregarem.
+   - Fallback visual se uma imagem falhar.
    ============================================================ */
 
 (function () {
   'use strict';
 
   const CONFIG = {
-    SHARE_URL: 'https://seu-usuario.github.io/desenrola/',
+    SHARE_URL: 'https://lcorreard.github.io/desenrola/',
+
+    /* === Imagens === */
+    IMAGENS_JSON: 'imagens.json',
+    /* Quantos temas usar por fase de Gaveta (máximo) */
+    DRAWER_MAX_TEMAS: 4,
+    /* Mínimo de imagens por tema para o jogo funcionar */
+    MIN_IMAGENS_POR_TEMA: 6,
+    /* Escala mínima e máxima para variação na Prateleira */
+    SHELF_SCALE_MIN: 0.85,
+    SHELF_SCALE_MAX: 1.15,
+    /* Padding da moldura branca ao redor das imagens (px) */
+    IMAGE_FRAME_PADDING: 4,
 
     SHELF_LEVELS: [
       { shelves: 2, pairs: 2, starChance: 0,    giftChance: 0    },
@@ -31,13 +41,20 @@
     ],
     ZEN_SHELF: { shelves: 2, pairs: 3, starChance: 0.15, giftChance: 0.08 },
     ZEN_THREADS: { threads: 4, nodes: 4 },
+    ZEN_DRAWER: { drawers: 3, compartments: 3, temas: 3 },
 
-    /* Nível fixo do desafio diário — usa a entrada índice 4 (nível 5) */
     DAILY_SHELF_LEVEL_IDX: 4,
     DAILY_THREADS_LEVEL_IDX: 4,
-
-    /* Tentativas por dia */
+    DAILY_DRAWER_LEVEL_IDX: 2,
     DAILY_MAX_ATTEMPTS: 3,
+
+    DRAWER_LEVELS: [
+      { drawers: 2, compartments: 3, temas: 2 },
+      { drawers: 3, compartments: 3, temas: 3 },
+      { drawers: 3, compartments: 4, temas: 3 },
+      { drawers: 4, compartments: 4, temas: 4 },
+      { drawers: 4, compartments: 5, temas: 4 },
+    ],
 
     THREAD_LEVELS: [
       { threads: 3, nodes: 3 },
@@ -54,37 +71,17 @@
 
     BACKGROUND: '#FFF5E6',
     SHELF: '#D2691E',
+    DRAWER_WOOD: '#8B6F47',
+    DRAWER_WOOD_DARK: '#6F5838',
     SNAP: '#3E7CB1',
     CELEBRATION: '#FFB74D',
     SLOT_BORDER: 'rgba(210, 105, 30, 0.22)',
     SLOT_HIGHLIGHT: '#5B9BD5',
     PAIR_MARK: '#3E7CB1',
+    DRAWER_DONE: '#7FA87F',
     SHADOW: 'rgba(139, 69, 19, 0.25)',
-
-    OBJECT_TYPES: [
-      { id: 'frasco',   palette: { color: '#F4C28A', accent: '#E0A566' } },
-      { id: 'vaso',     palette: { color: '#E8A87C', accent: '#D18F5F' } },
-      { id: 'livro',    palette: { color: '#D98880', accent: '#C46B63' } },
-      { id: 'quadro',   palette: { color: '#F0B860', accent: '#D9A040' } },
-      { id: 'xicara',   palette: { color: '#E89B6E', accent: '#D17E4F' } },
-      { id: 'prato',    palette: { color: '#C79BC4', accent: '#AD7EAA' } },
-      { id: 'garrafa',  palette: { color: '#E8A050', accent: '#D18838' } },
-      { id: 'lata',     palette: { color: '#9BB0D4', accent: '#7E94BA' } },
-      { id: 'caixa',    palette: { color: '#E07856', accent: '#C46040' } },
-      { id: 'rolo',     palette: { color: '#E8D070', accent: '#D1B840' } },
-      { id: 'cesta',    palette: { color: '#E8B860', accent: '#D1A040' } },
-      { id: 'pote',     palette: { color: '#E8A8A0', accent: '#D18880' } },
-      { id: 'cilindro', palette: { color: '#E8A0B8', accent: '#D17EA0' } },
-      { id: 'cristal',  palette: { color: '#A8C8E8', accent: '#8AA8D1' } },
-      { id: 'ampulheta',palette: { color: '#E8C060', accent: '#D1A840' } },
-    ],
-
-    OBJECT_FAMILY: {
-      vaso: 'big', garrafa: 'big', pote: 'big', cilindro: 'big', cristal: 'big', ampulheta: 'big',
-      frasco: 'mid', quadro: 'mid', caixa: 'mid', rolo: 'mid', cesta: 'mid',
-      livro: 'small', xicara: 'small', lata: 'small', prato: 'small',
-      estrela: 'mid', presente: 'mid',
-    },
+    FRAME_BG: '#FFFFFF',
+    FRAME_BORDER: 'rgba(61, 50, 41, 0.15)',
 
     STAR_PALETTE: { color: '#FFD54F', accent: '#FFB300' },
     GIFT_PALETTE: { color: '#F06292', accent: '#E91E63' },
@@ -94,6 +91,11 @@
     POINTS_GIFT: 100,
     POINTS_PHASE_BONUS: 50,
     POINTS_PER_SECOND_LEFT: 2,
+
+    DRAWER_POINTS_MOVE: 5,
+    DRAWER_POINTS_DRAWER: 20,
+    DRAWER_POINTS_PHASE: 50,
+    DRAWER_SECONDS_PER_OBJECT: 4,
 
     THREAD_POINTS_CLEAN: 20,
     THREAD_POINTS_ELECTRIC: 100,
@@ -127,11 +129,11 @@
     ACHIEVEMENTS: [
       { id: 'first_shelf',   icon: '▤', name: 'Primeira prateleira',  desc: 'Complete 1 prateleira' },
       { id: 'first_thread',  icon: '〜', name: 'Primeiro fio',         desc: 'Complete 1 fase de fios' },
+      { id: 'first_drawer',  icon: '🗄', name: 'Primeira gaveta',      desc: 'Complete 1 fase de gaveta' },
       { id: 'shelf_5',       icon: '📚', name: 'Colecionadora',       desc: 'Complete 5 prateleiras' },
       { id: 'thread_5',      icon: '🪢', name: 'Desembaraçadora',      desc: 'Complete 5 fases de fios' },
+      { id: 'drawer_5',      icon: '📦', name: 'Organizadora',        desc: 'Complete 5 fases de gaveta' },
       { id: 'electric',      icon: '⚡', name: 'Fio elétrico',         desc: 'Desembarace um fio elétrico' },
-      { id: 'star',          icon: '⭐', name: 'Estrela-guia',         desc: 'Pareie uma estrela' },
-      { id: 'gift',          icon: '🎁', name: 'Presente perfeito',    desc: 'Pareie um presente' },
       { id: 'score_1000',    icon: '🏆', name: 'Mil pontos',           desc: 'Acumule 1000 pontos' },
       { id: 'daily_first',   icon: '🎯', name: 'Primeiro desafio',     desc: 'Complete 1 desafio diário' },
       { id: 'daily_3',       icon: '🔥', name: 'Três seguidos',        desc: '3 dias de desafio seguidos' },
@@ -147,10 +149,12 @@
   const btnNew = document.getElementById('btn-new');
   const btnMenu = document.getElementById('btn-menu');
   const menuEl = document.getElementById('menu');
+  const menuExtrasEl = document.getElementById('menu-extras');
   const gameAreaEl = document.getElementById('game-area');
   const btnShelf = document.getElementById('btn-shelf');
   const btnThreads = document.getElementById('btn-threads');
   const btnZen = document.getElementById('btn-zen');
+  const btnDrawer = document.getElementById('btn-drawer');
   const btnDaily = document.getElementById('btn-daily');
   const btnMute = document.getElementById('btn-mute');
   const btnAmbient = document.getElementById('btn-ambient');
@@ -159,11 +163,14 @@
   const helpPanel = document.getElementById('help-panel');
   const helpShelfPanel = document.getElementById('help-shelf-panel');
   const helpThreadsPanel = document.getElementById('help-threads-panel');
+  const helpDrawerPanel = document.getElementById('help-drawer-panel');
   const btnCloseHelp = document.getElementById('btn-close-help');
   const btnCloseHelpShelf = document.getElementById('btn-close-help-shelf');
   const btnCloseHelpThreads = document.getElementById('btn-close-help-threads');
+  const btnCloseHelpDrawer = document.getElementById('btn-close-help-drawer');
   const countShelf = document.getElementById('count-shelf');
   const countThreads = document.getElementById('count-threads');
+  const countDrawer = document.getElementById('count-drawer');
   const countDaily = document.getElementById('count-daily');
   const btnReset = document.getElementById('btn-reset');
   const btnAchievements = document.getElementById('btn-achievements');
@@ -199,7 +206,7 @@
   const btnDailyClose = document.getElementById('btn-daily-close');
 
   /* ============================================================
-     PRNG — gerador pseudo-aleatório determinístico (mulberry32)
+     PRNG
      ============================================================ */
   function mulberry32(seed) {
     let a = seed >>> 0;
@@ -211,8 +218,6 @@
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
   }
-
-  /** Hash simples de string → inteiro de 32 bits. */
   function hashString(str) {
     let h = 2166136261;
     for (let i = 0; i < str.length; i++) {
@@ -221,8 +226,6 @@
     }
     return h >>> 0;
   }
-
-  /** Retorna a data atual em YYYY-MM-DD no fuso local. */
   function todayKey() {
     const d = new Date();
     const y = d.getFullYear();
@@ -230,28 +233,129 @@
     const day = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
   }
-
-  /**
-   * Decide o mecanismo do desafio do dia baseado na data.
-   * Segunda/Quarta/Sexta/Sábado: Prateleira
-   * Terça/Quinta: Fios
-   * Domingo: aleatório (determinístico pela seed)
-   */
   function dailyMechanicForDate(dateKey) {
     const d = new Date(dateKey + 'T12:00:00');
-    const dow = d.getDay(); // 0=dom, 1=seg, ...
+    const dow = d.getDay();
     if (dow === 0) {
-      // Domingo: aleatório determinístico
       const seed = hashString(dateKey + '-sunday');
-      return (seed % 2 === 0) ? 'shelf' : 'threads';
+      const r = seed % 3;
+      return r === 0 ? 'shelf' : r === 1 ? 'threads' : 'drawer';
     }
-    if (dow === 2 || dow === 4) return 'threads'; // ter, qui
-    return 'shelf'; // seg, qua, sex, sáb
+    if (dow === 2 || dow === 4) return 'threads';
+    if (dow === 3) return 'drawer';
+    return 'shelf';
   }
 
+  /* ============================================================
+     IMAGE LOADER
+     ============================================================ */
+  const ImageLoader = {
+    temas: [],
+    porId: {},
+    carregado: false,
+    erro: null,
+
+    async carregar() {
+      try {
+        const resp = await fetch(CONFIG.IMAGENS_JSON, { cache: 'no-cache' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (!data || !Array.isArray(data.temas)) {
+          throw new Error('Formato de imagens.json inválido');
+        }
+        const temasFiltrados = data.temas.filter(t =>
+          Array.isArray(t.imagens) && t.imagens.length >= 1
+        );
+        if (temasFiltrados.length === 0) {
+          throw new Error('Nenhum tema encontrado');
+        }
+
+        const promessas = [];
+        for (const tema of temasFiltrados) {
+          tema._imagensCarregadas = [];
+          for (const caminho of tema.imagens) {
+            promessas.push(
+              this._carregarImagem(caminho).then((img) => {
+                if (img) tema._imagensCarregadas.push(img);
+              })
+            );
+          }
+        }
+        await Promise.all(promessas);
+
+        this.temas = temasFiltrados.filter(t =>
+          t._imagensCarregadas.length >= Math.min(CONFIG.MIN_IMAGENS_POR_TEMA, t.imagens.length)
+        );
+        if (this.temas.length === 0) {
+          // fallback: aceita temas com pelo menos 1 imagem
+          this.temas = temasFiltrados.filter(t => t._imagensCarregadas.length > 0);
+        }
+        if (this.temas.length === 0) {
+          throw new Error('Nenhuma imagem carregou com sucesso');
+        }
+
+        for (const t of this.temas) {
+          this.porId[t.id] = t;
+        }
+        this.carregado = true;
+      } catch (e) {
+        this.erro = e;
+        console.error('[ImageLoader] Erro:', e);
+      }
+    },
+
+    _carregarImagem(src) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => {
+          console.warn('[ImageLoader] Falha:', src);
+          resolve(null);
+        };
+        img.src = src;
+      });
+    },
+
+    sortearImagens(tema, n) {
+      if (!tema || tema._imagensCarregadas.length === 0) return [];
+      const pool = tema._imagensCarregadas.slice();
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      const resultado = [];
+      for (let i = 0; i < n; i++) {
+        resultado.push(pool[i % pool.length]);
+      }
+      return resultado;
+    },
+
+    temaAleatorio() {
+      if (this.temas.length === 0) return null;
+      return this.temas[Math.floor(rng() * this.temas.length)];
+    },
+
+    nTemasAleatorios(n) {
+      const pool = this.temas.slice();
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      const resultado = [];
+      for (let i = 0; i < n; i++) {
+        resultado.push(pool[i % pool.length]);
+      }
+      return resultado;
+    },
+  };
+
+  /* ============================================================
+     PROGRESS
+     ============================================================ */
   const Progress = {
     data: {
-      shelf: 0, threads: 0, score: 0, achievements: [], muted: false, ambient: true,
+      shelf: 0, threads: 0, drawer: 0, score: 0,
+      achievements: [], muted: false, ambient: true,
       daily: {
         streak: 0,
         lastCompletedDate: null,
@@ -267,6 +371,7 @@
           if (parsed && typeof parsed === 'object') {
             this.data.shelf = Number(parsed.shelf) || 0;
             this.data.threads = Number(parsed.threads) || 0;
+            this.data.drawer = Number(parsed.drawer) || 0;
             this.data.score = Number(parsed.score) || 0;
             this.data.achievements = Array.isArray(parsed.achievements) ? parsed.achievements : [];
             this.data.muted = !!parsed.muted;
@@ -288,30 +393,25 @@
             }
           }
         }
-      } catch (e) {
-        // mantém defaults
-      }
-      // Reset diário: se a data mudou, zera o "today"
+      } catch (e) {}
       this.ensureTodayReset();
     },
     save() {
       try { localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(this.data)); } catch (e) {}
     },
     increment(which) {
-      if (which === 'shelf' || which === 'threads') { this.data[which]++; this.save(); }
+      if (which === 'shelf' || which === 'threads' || which === 'drawer') {
+        this.data[which]++; this.save();
+      }
     },
     addScore(points) { this.data.score += points; this.save(); },
     reset() {
       const keepMute = this.data.muted;
       const keepAmbient = this.data.ambient;
       this.data = {
-        shelf: 0, threads: 0, score: 0, achievements: [], muted: keepMute, ambient: keepAmbient,
-        daily: {
-          streak: 0,
-          lastCompletedDate: null,
-          history: [],
-          today: { date: null, attemptsUsed: 0, bestScore: 0, completed: false },
-        },
+        shelf: 0, threads: 0, drawer: 0, score: 0,
+        achievements: [], muted: keepMute, ambient: keepAmbient,
+        daily: { streak: 0, lastCompletedDate: null, history: [], today: { date: null, attemptsUsed: 0, bestScore: 0, completed: false } },
       };
       try { localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(this.data)); } catch (e) {}
     },
@@ -322,45 +422,23 @@
       this.save();
       return true;
     },
-    toggleMute() {
-      this.data.muted = !this.data.muted;
-      this.save();
-      return this.data.muted;
-    },
-    toggleAmbient() {
-      this.data.ambient = !this.data.ambient;
-      this.save();
-      return this.data.ambient;
-    },
-
-    /** Garante que `today` reflete o dia atual. */
+    toggleMute() { this.data.muted = !this.data.muted; this.save(); return this.data.muted; },
+    toggleAmbient() { this.data.ambient = !this.data.ambient; this.save(); return this.data.ambient; },
     ensureTodayReset() {
       const tk = todayKey();
       if (this.data.daily.today.date !== tk) {
-        this.data.daily.today = {
-          date: tk,
-          attemptsUsed: 0,
-          bestScore: 0,
-          completed: false,
-        };
+        this.data.daily.today = { date: tk, attemptsUsed: 0, bestScore: 0, completed: false };
         this.save();
       }
     },
-
-    /** Calcula se o streak continua (conta ontem) ou quebrou. */
     updateStreakIfNeeded() {
       const tk = todayKey();
       const last = this.data.daily.lastCompletedDate;
       if (!last) return;
-      // Diferença em dias entre hoje e a última conclusão
       const d1 = new Date(tk + 'T12:00:00');
       const d2 = new Date(last + 'T12:00:00');
       const diffDays = Math.round((d1 - d2) / 86400000);
-      if (diffDays > 1) {
-        // Quebrou o streak (ficou > 1 dia sem completar)
-        this.data.daily.streak = 0;
-        this.save();
-      }
+      if (diffDays > 1) { this.data.daily.streak = 0; this.save(); }
     },
   };
 
@@ -384,10 +462,7 @@
   function tryUnlock(id) {
     if (Progress.unlockAchievement(id)) {
       const ach = CONFIG.ACHIEVEMENTS.find(a => a.id === id);
-      if (ach) {
-        showToast(ach.icon, ach.name);
-        playBonus();
-      }
+      if (ach) { showToast(ach.icon, ach.name); playBonus(); }
     }
   }
   function checkAchievementsAfterShelf() {
@@ -398,6 +473,11 @@
   function checkAchievementsAfterThreads() {
     if (Progress.data.threads >= 1) tryUnlock('first_thread');
     if (Progress.data.threads >= 5) tryUnlock('thread_5');
+    if (Progress.data.score >= 1000) tryUnlock('score_1000');
+  }
+  function checkAchievementsAfterDrawer() {
+    if (Progress.data.drawer >= 1) tryUnlock('first_drawer');
+    if (Progress.data.drawer >= 5) tryUnlock('drawer_5');
     if (Progress.data.score >= 1000) tryUnlock('score_1000');
   }
   function checkAchievementsAfterDaily() {
@@ -430,7 +510,7 @@
     }
     for (const entry of history) {
       const li = document.createElement('li');
-      const icon = entry.mechanic === 'threads' ? '〜' : '▤';
+      const icon = entry.mechanic === 'threads' ? '〜' : entry.mechanic === 'drawer' ? '🗄' : '▤';
       const [y, m, d] = entry.date.split('-');
       const dateLabel = `${d}/${m}`;
       const scoreLabel = entry.completed ? `${entry.bestScore} pts` : '—';
@@ -440,57 +520,26 @@
       dailyList.appendChild(li);
     }
   }
-  function openHelpGeneral() {
-    helpPanel.classList.remove('hidden');
-    helpPanel.style.display = 'flex';
-  }
-  function closeHelpGeneral() {
-    helpPanel.classList.add('hidden');
-    helpPanel.style.display = 'none';
-  }
-  function openHelpShelf() {
-    helpShelfPanel.classList.remove('hidden');
-    helpShelfPanel.style.display = 'flex';
-  }
-  function closeHelpShelf() {
-    helpShelfPanel.classList.add('hidden');
-    helpShelfPanel.style.display = 'none';
-  }
-  function openHelpThreads() {
-    helpThreadsPanel.classList.remove('hidden');
-    helpThreadsPanel.style.display = 'flex';
-  }
-  function closeHelpThreads() {
-    helpThreadsPanel.classList.add('hidden');
-    helpThreadsPanel.style.display = 'none';
-  }
-  function openAchievements() {
-    renderAchievements();
-    achPanel.classList.remove('hidden');
-    achPanel.style.display = 'flex';
-  }
-  function closeAchievements() {
-    achPanel.classList.add('hidden');
-    achPanel.style.display = 'none';
-  }
-  function openDailyPanel() {
-    renderDailyPanel();
-    dailyPanel.classList.remove('hidden');
-    dailyPanel.style.display = 'flex';
-  }
-  function closeDailyPanel() {
-    dailyPanel.classList.add('hidden');
-    dailyPanel.style.display = 'none';
-  }
+  function openHelpGeneral() { helpPanel.classList.remove('hidden'); helpPanel.style.display = 'flex'; }
+  function closeHelpGeneral() { helpPanel.classList.add('hidden'); helpPanel.style.display = 'none'; }
+  function openHelpShelf() { helpShelfPanel.classList.remove('hidden'); helpShelfPanel.style.display = 'flex'; }
+  function closeHelpShelf() { helpShelfPanel.classList.add('hidden'); helpShelfPanel.style.display = 'none'; }
+  function openHelpThreads() { helpThreadsPanel.classList.remove('hidden'); helpThreadsPanel.style.display = 'flex'; }
+  function closeHelpThreads() { helpThreadsPanel.classList.add('hidden'); helpThreadsPanel.style.display = 'none'; }
+  function openHelpDrawer() { helpDrawerPanel.classList.remove('hidden'); helpDrawerPanel.style.display = 'flex'; }
+  function closeHelpDrawer() { helpDrawerPanel.classList.add('hidden'); helpDrawerPanel.style.display = 'none'; }
+  function openAchievements() { renderAchievements(); achPanel.classList.remove('hidden'); achPanel.style.display = 'flex'; }
+  function closeAchievements() { achPanel.classList.add('hidden'); achPanel.style.display = 'none'; }
+  function openDailyPanel() { renderDailyPanel(); dailyPanel.classList.remove('hidden'); dailyPanel.style.display = 'flex'; }
+  function closeDailyPanel() { dailyPanel.classList.add('hidden'); dailyPanel.style.display = 'none'; }
   function openContextHelp() {
     if (currentScene === 'shelf') openHelpShelf();
     else if (currentScene === 'threads') openHelpThreads();
+    else if (currentScene === 'drawer') openHelpDrawer();
     else openHelpGeneral();
   }
   function closeAllHelps() {
-    closeHelpGeneral();
-    closeHelpShelf();
-    closeHelpThreads();
+    closeHelpGeneral(); closeHelpShelf(); closeHelpThreads(); closeHelpDrawer();
   }
 
   /* ============================================================
@@ -507,7 +556,6 @@
     if (audioCtx.state === 'suspended') audioCtx.resume();
     return audioCtx;
   }
-
   function _tone(freq, duration, volume, type, startTime) {
     const c = ensureAudio(); if (!c) return;
     const t = startTime !== undefined ? startTime : c.currentTime;
@@ -524,11 +572,6 @@
     osc.start(t); osc.stop(t + d + 0.02);
   }
   function playSound(freq, duration) { _tone(freq, duration || 0.12, 0.25, 'sine'); }
-  function playSnapByFamily(family) {
-    if (family === 'big') _tone(600, 0.14, 0.28, 'sine');
-    else if (family === 'small') _tone(1000, 0.10, 0.22, 'sine');
-    else _tone(800, 0.12, 0.25, 'sine');
-  }
   function playSlide() {
     const c = ensureAudio(); if (!c) return;
     const t = c.currentTime;
@@ -557,12 +600,6 @@
     const notes = [659.25, 987.77];
     notes.forEach((f, i) => _tone(f, 0.14, 0.22, 'sine', c.currentTime + i * 0.07));
   }
-  function playGiftSound() {
-    const c = ensureAudio(); if (!c) return;
-    const now = c.currentTime;
-    const notes = [523.25, 659.25, 783.99, 1046.50];
-    notes.forEach((f, i) => _tone(f, 0.16, 0.20, 'sine', now + i * 0.07));
-  }
   function playElectricSound() {
     const c = ensureAudio(); if (!c) return;
     const now = c.currentTime;
@@ -578,8 +615,13 @@
     osc.start(now); osc.stop(now + 0.22);
     _tone(1760, 0.10, 0.10, 'sine', now + 0.02);
   }
+  function playDrawerDone() {
+    const c = ensureAudio(); if (!c) return;
+    const now = c.currentTime;
+    const notes = [659.25, 987.77];
+    notes.forEach((f, i) => _tone(f, 0.15, 0.22, 'sine', now + i * 0.08));
+  }
 
-  /* AmbientPlayer */
   class AmbientPlayer {
     constructor() {
       this.audio = null;
@@ -656,6 +698,9 @@
   }
   const ambient = new AmbientPlayer();
 
+  /* ============================================================
+     HELPERS BÁSICOS
+     ============================================================ */
   function dist(x1, y1, x2, y2) { return Math.hypot(x2 - x1, y2 - y1); }
   function lerp(a, b, t) { return a + (b - a) * t; }
   function cubicBezier(p0, p1, p2, p3, t) {
@@ -731,7 +776,51 @@
   }
 
   /* ============================================================
-     COMPARTILHAR — card 600×315
+     DESENHO DE IMAGEM COM MOLDURA BRANCA
+     ============================================================ */
+  function drawFramedImage(img, w, h, framePadding) {
+    const pad = framePadding !== undefined ? framePadding : CONFIG.IMAGE_FRAME_PADDING;
+    const frameW = w + pad * 2;
+    const frameH = h + pad * 2;
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(61, 50, 41, 0.15)';
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetY = 3;
+    ctx.fillStyle = CONFIG.FRAME_BG;
+    roundRect(-frameW / 2, -frameH / 2, frameW, frameH, 6);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.strokeStyle = CONFIG.FRAME_BORDER;
+    ctx.lineWidth = 1;
+    roundRect(-frameW / 2, -frameH / 2, frameW, frameH, 6);
+    ctx.stroke();
+
+    if (img && img.complete && img.naturalWidth > 0) {
+      const imgAspect = img.naturalWidth / img.naturalHeight;
+      let drawW = w;
+      let drawH = h;
+      if (imgAspect > 1) {
+        drawH = w / imgAspect;
+      } else {
+        drawW = h * imgAspect;
+      }
+      ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+    } else {
+      ctx.fillStyle = 'rgba(201, 168, 140, 0.35)';
+      roundRect(-w / 2, -h / 2, w, h, 4);
+      ctx.fill();
+      ctx.fillStyle = '#5C2E0E';
+      ctx.font = `bold ${Math.floor(h * 0.5)}px system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('?', 0, 1);
+    }
+  }
+
+  /* ============================================================
+     SHARE CARD
      ============================================================ */
   function generateShareCard(mechanicOverride) {
     const W_CARD = 600;
@@ -743,17 +832,14 @@
 
     g.fillStyle = '#FFF5E6';
     g.fillRect(0, 0, W_CARD, H_CARD);
-
     g.strokeStyle = 'rgba(210, 105, 30, 0.35)';
     g.lineWidth = 3;
     g.strokeRect(12, 12, W_CARD - 24, H_CARD - 24);
-
     g.fillStyle = '#5C2E0E';
     g.font = '300 42px system-ui, -apple-system, "Segoe UI", sans-serif';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.fillText('Desenrola', W_CARD / 2, 70);
-
     g.strokeStyle = 'rgba(62, 124, 177, 0.4)';
     g.lineWidth = 2;
     g.beginPath();
@@ -761,12 +847,8 @@
     g.lineTo(W_CARD / 2 + 60, 100);
     g.stroke();
 
-    // Determina o conteúdo
-    let mainLabel = '';
-    let mainValue = '';
-    let subLabel = '';
-    let mechanicIcon = '🌿';
-    let mechanicName = 'Zen';
+    let mainLabel = '', mainValue = '', subLabel = '';
+    let mechanicIcon = '🌿', mechanicName = 'Zen';
 
     if (mechanicOverride === 'daily') {
       const streak = Progress.data.daily.streak;
@@ -774,8 +856,8 @@
       mainValue = `${Progress.data.daily.today.bestScore}`;
       subLabel = 'pontos' + (streak > 0 ? ` · 🔥 ${streak} dias` : '');
       const mech = dailyMechanicForDate(todayKey());
-      mechanicIcon = mech === 'threads' ? '〜' : '▤';
-      mechanicName = mech === 'threads' ? 'Fios' : 'Prateleira';
+      mechanicIcon = mech === 'threads' ? '〜' : mech === 'drawer' ? '🗄' : '▤';
+      mechanicName = mech === 'threads' ? 'Fios' : mech === 'drawer' ? 'Gaveta' : 'Prateleira';
     } else {
       const level = Progress.data.shelf + 1;
       mainLabel = 'NÍVEL';
@@ -783,38 +865,33 @@
       subLabel = `${Progress.data.score} pontos`;
       if (currentScene === 'shelf') { mechanicIcon = '▤'; mechanicName = 'Prateleira'; }
       else if (currentScene === 'threads') { mechanicIcon = '〜'; mechanicName = 'Fios'; }
+      else if (currentScene === 'drawer') { mechanicIcon = '🗄'; mechanicName = 'Gaveta'; }
     }
 
     g.fillStyle = '#A0522D';
     g.font = '400 20px system-ui, -apple-system, "Segoe UI", sans-serif';
     g.fillText(mainLabel, W_CARD / 2, 140);
-
     g.fillStyle = '#3E7CB1';
     g.font = '300 72px system-ui, -apple-system, "Segoe UI", sans-serif';
     g.fillText(mainValue, W_CARD / 2, 190);
-
     g.fillStyle = '#5C2E0E';
     g.font = '400 26px system-ui, -apple-system, "Segoe UI", sans-serif';
     g.fillText(subLabel, W_CARD / 2, 240);
-
     g.fillStyle = '#3E7CB1';
     g.font = '500 20px system-ui, -apple-system, "Segoe UI", sans-serif';
     g.fillText(`${mechanicIcon}  ${mechanicName}`, W_CARD / 2, 280);
 
     return c;
   }
-
   function canvasToBlob(c) {
     return new Promise((resolve) => {
       if (c.toBlob) c.toBlob((blob) => resolve(blob), 'image/png');
       else resolve(null);
     });
   }
-
   async function shareScore() {
     const card = generateShareCard('normal');
     const text = `Completei o nível ${Progress.data.shelf + 1} do Desenrola com ${Progress.data.score} pontos! 🌿\nJogue em: ${CONFIG.SHARE_URL}`;
-
     if (navigator.share && navigator.canShare) {
       try {
         const blob = await canvasToBlob(card);
@@ -827,11 +904,8 @@
         }
         await navigator.share({ title: 'Desenrola', text });
         return;
-      } catch (e) {
-        if (e && e.name === 'AbortError') return;
-      }
+      } catch (e) { if (e && e.name === 'AbortError') return; }
     }
-
     try {
       const url = card.toDataURL('image/png');
       const a = document.createElement('a');
@@ -841,18 +915,14 @@
       a.click();
       document.body.removeChild(a);
       setStatus('Imagem salva para compartilhar 📤', false);
-    } catch (e) {
-      setStatus('Não foi possível gerar a imagem', false);
-    }
+    } catch (e) { setStatus('Não foi possível gerar a imagem', false); }
   }
-
   async function shareDailyScore() {
     const card = generateShareCard('daily');
     const streak = Progress.data.daily.streak;
     const score = Progress.data.daily.today.bestScore;
     const streakText = streak > 0 ? ` · 🔥 ${streak} dias seguidos` : '';
     const text = `Fiz ${score} pontos no Desafio do Dia do Desenrola!${streakText} 🌿\nJogue em: ${CONFIG.SHARE_URL}`;
-
     if (navigator.share && navigator.canShare) {
       try {
         const blob = await canvasToBlob(card);
@@ -865,11 +935,8 @@
         }
         await navigator.share({ title: 'Desafio do Desenrola', text });
         return;
-      } catch (e) {
-        if (e && e.name === 'AbortError') return;
-      }
+      } catch (e) { if (e && e.name === 'AbortError') return; }
     }
-
     try {
       const url = card.toDataURL('image/png');
       const a = document.createElement('a');
@@ -879,12 +946,12 @@
       a.click();
       document.body.removeChild(a);
       setStatus('Imagem salva para compartilhar 📤', false);
-    } catch (e) {
-      setStatus('Não foi possível gerar a imagem', false);
-    }
+    } catch (e) { setStatus('Não foi possível gerar a imagem', false); }
   }
 
-  /* Desenhos dos objetos */
+  /* ============================================================
+     DESENHOS DOS OBJETOS (fallback / Fios)
+     ============================================================ */
   function drawFrasco(w, h, fill, accent) {
     ctx.fillStyle = fill;
     ctx.beginPath();
@@ -1053,7 +1120,6 @@
     ctx.beginPath(); ctx.arc(-w * 0.15, -h * 0.45, w * 0.12, 0, Math.PI * 2); ctx.stroke();
     ctx.beginPath(); ctx.arc(w * 0.15, -h * 0.45, w * 0.12, 0, Math.PI * 2); ctx.stroke();
   }
-
   function drawObjectShape(type, w, h, palette) {
     const fill = palette.color;
     const accent = palette.accent;
@@ -1079,34 +1145,35 @@
   }
 
   /* ============================================================
-     VARIÁVEIS GLOBAIS DE ESTADO
+     VARIÁVEIS GLOBAIS
      ============================================================ */
   let zenMode = false;
   let dailyMode = false;
-  let dailyMechanic = null;   // 'shelf' | 'threads' quando em modo daily
-  let dailySeedRng = null;    // PRNG determinístico ativo (ou null)
-  let dailyAttemptScore = 0;  // pontos ganhos na tentativa atual
+  let dailyMechanic = null;
+  let dailySeedRng = null;
+  let dailyAttemptScore = 0;
+
+  function rng() { return dailySeedRng ? dailySeedRng() : Math.random(); }
 
   function getShelfParams() {
     if (dailyMode) {
-      // Nível fixo 5 para todos, mas com seed determinístico
       const base = CONFIG.SHELF_LEVELS[CONFIG.DAILY_SHELF_LEVEL_IDX];
       const slotsPerShelf = base.pairs * 2 + 1;
       const totalPairs = base.pairs * base.shelves;
       const timeLimit = 30 + totalPairs * 8;
-      return { level: 5, zen: false, daily: true, shelves: base.shelves, pairs: base.pairs, slotsPerShelf, starChance: base.starChance, giftChance: base.giftChance, timeLimit };
+      return { level: 5, zen: false, daily: true, shelves: base.shelves, pairs: base.pairs, slotsPerShelf, starChance: 0, giftChance: 0, timeLimit };
     }
     if (zenMode) {
       const base = CONFIG.ZEN_SHELF;
       const slotsPerShelf = base.pairs * 2 + 1;
-      return { level: 0, zen: true, shelves: base.shelves, pairs: base.pairs, slotsPerShelf, starChance: base.starChance, giftChance: base.giftChance, timeLimit: 9999 };
+      return { level: 0, zen: true, shelves: base.shelves, pairs: base.pairs, slotsPerShelf, starChance: 0, giftChance: 0, timeLimit: 9999 };
     }
     const idx = Math.min(Progress.data.shelf, CONFIG.SHELF_LEVELS.length - 1);
     const base = CONFIG.SHELF_LEVELS[idx];
     const slotsPerShelf = base.pairs * 2 + 1;
     const totalPairs = base.pairs * base.shelves;
     const timeLimit = 30 + totalPairs * 8;
-    return { level: idx + 1, zen: false, shelves: base.shelves, pairs: base.pairs, slotsPerShelf, starChance: base.starChance, giftChance: base.giftChance, timeLimit };
+    return { level: idx + 1, zen: false, shelves: base.shelves, pairs: base.pairs, slotsPerShelf, starChance: 0, giftChance: 0, timeLimit };
   }
   function getThreadsParams() {
     if (dailyMode) {
@@ -1123,25 +1190,40 @@
     const timeLimit = 40 + base.threads * 15;
     return { level: idx + 1, zen: false, threadCount: base.threads, nodesPerThread: base.nodes, timeLimit };
   }
+  function getDrawerParams() {
+    if (dailyMode) {
+      const base = CONFIG.DRAWER_LEVELS[CONFIG.DAILY_DRAWER_LEVEL_IDX];
+      const totalObjects = base.drawers * (base.compartments - 1);
+      const timeLimit = 30 + totalObjects * CONFIG.DRAWER_SECONDS_PER_OBJECT;
+      return { level: 5, zen: false, daily: true, drawers: base.drawers, compartments: base.compartments, temas: base.temas, timeLimit };
+    }
+    if (zenMode) {
+      const base = CONFIG.ZEN_DRAWER;
+      return { level: 0, zen: true, drawers: base.drawers, compartments: base.compartments, temas: base.temas, timeLimit: 9999 };
+    }
+    const idx = Math.min(Progress.data.drawer, CONFIG.DRAWER_LEVELS.length - 1);
+    const base = CONFIG.DRAWER_LEVELS[idx];
+    const totalObjects = base.drawers * (base.compartments - 1);
+    const timeLimit = 30 + totalObjects * CONFIG.DRAWER_SECONDS_PER_OBJECT;
+    return { level: idx + 1, zen: false, drawers: base.drawers, compartments: base.compartments, temas: base.temas, timeLimit };
+  }
 
   let W = 0, H = 0;
   let currentScene = null;
   let lastTime = 0;
 
-  /** Helpers para usar o PRNG determinístico quando em modo daily. */
-  function rng() {
-    return dailySeedRng ? dailySeedRng() : Math.random();
-  }
-
-  /* CENA: PRATELEIRA */
+    /* ============================================================
+     CENA: PRATELEIRA
+     ============================================================ */
   const ShelfScene = {
     shelves: [], items: [], dragging: null, returning: [],
     complete: false, celebrationTimer: 0,
     params: null, _nextId: 1,
     timeLeft: 0, scoreThisPhase: 0, pairsFormed: 0, totalPairs: 0,
     _prevPairs: new Set(), _scoredPairs: new Set(),
-    _statNormal: 0, _statStar: 0, _statGift: 0, _timeBonus: 0,
+    _statNormal: 0, _timeBonus: 0,
     _pulseTime: 0, _zen: false, _daily: false,
+    _tema: null,
 
     reset() {
       this.params = getShelfParams();
@@ -1161,8 +1243,15 @@
       this.totalPairs = this.params.shelves * this.params.pairs;
       this._prevPairs = new Set();
       this._scoredPairs = new Set();
-      this._statNormal = 0; this._statStar = 0; this._statGift = 0;
+      this._statNormal = 0;
       this._timeBonus = 0;
+
+      // Sorteia um tema
+      this._tema = ImageLoader.temaAleatorio();
+      if (!this._tema) {
+        console.error('[Shelf] Nenhum tema carregado');
+        return;
+      }
 
       const numShelves = this.params.shelves;
       const pairsPerShelf = this.params.pairs;
@@ -1184,43 +1273,40 @@
       }
 
       const totalPairs = numShelves * pairsPerShelf;
-      const pool = CONFIG.OBJECT_TYPES.slice();
-      for (let i = pool.length - 1; i > 0; i--) {
-        const j = Math.floor(rng() * (i + 1));
-        [pool[i], pool[j]] = [pool[j], pool[i]];
+
+      // Sorteia `totalPairs` imagens únicas do tema
+      const imagensUnicas = ImageLoader.sortearImagens(this._tema, totalPairs);
+      if (imagensUnicas.length < totalPairs) {
+        console.error('[Shelf] Imagens insuficientes no tema', this._tema.nome);
+        return;
       }
+
+      // Cria a lista de pares (cada par tem 2 cópias da mesma imagem)
       const pairList = [];
       for (let p = 0; p < totalPairs; p++) {
-        pairList.push({ pairId: p, type: pool[p % pool.length].id, palette: pool[p % pool.length].palette, kind: 'normal' });
+        const img = imagensUnicas[p];
+        // Escala aleatória leve (0.85 a 1.15)
+        const scale = CONFIG.SHELF_SCALE_MIN +
+                      rng() * (CONFIG.SHELF_SCALE_MAX - CONFIG.SHELF_SCALE_MIN);
+        pairList.push({
+          pairId: p,
+          image: img,
+          kind: 'normal',
+          visualScale: scale,
+        });
       }
 
-      const wantStar = rng() < this.params.starChance;
-      const wantGift = rng() < this.params.giftChance;
-      if (wantStar || wantGift) {
-        const idxs = pairList.map((_, i) => i);
-        for (let i = idxs.length - 1; i > 0; i--) {
-          const j = Math.floor(rng() * (i + 1));
-          [idxs[i], idxs[j]] = [idxs[j], idxs[i]];
-        }
-        let cursor = 0;
-        if (wantGift && cursor < idxs.length) {
-          const idx = idxs[cursor++];
-          pairList[idx].kind = 'presente';
-          pairList[idx].type = 'presente';
-          pairList[idx].palette = CONFIG.GIFT_PALETTE;
-        }
-        if (wantStar && cursor < idxs.length) {
-          const idx = idxs[cursor++];
-          pairList[idx].kind = 'estrela';
-          pairList[idx].type = 'estrela';
-          pairList[idx].palette = CONFIG.STAR_PALETTE;
-        }
-      }
-
+      // Embaralha todos os objetos
       const allItems = [];
       for (const p of pairList) {
         for (let k = 0; k < 2; k++) {
-          allItems.push({ id: this._nextId++, type: p.type, palette: p.palette, pairId: p.pairId, kind: p.kind });
+          allItems.push({
+            id: this._nextId++,
+            pairId: p.pairId,
+            image: p.image,
+            kind: p.kind,
+            visualScale: p.visualScale,
+          });
         }
       }
       for (let i = allItems.length - 1; i > 0; i--) {
@@ -1228,6 +1314,7 @@
         [allItems[i], allItems[j]] = [allItems[j], allItems[i]];
       }
 
+      // Distribui deixando 1 vaga por prateleira
       const emptyPerShelf = new Set();
       for (let s = 0; s < numShelves; s++) {
         const slotToEmpty = Math.floor(rng() * slotsPerShelf);
@@ -1264,6 +1351,7 @@
       this._prevPairs = this._currentPairKeys();
       this._scoredPairs = new Set();
     },
+
     _swapItems(a, b) {
       const aShelf = a.shelfIndex, aSlot = a.slotIndex;
       const bShelf = b.shelfIndex, bSlot = b.slotIndex;
@@ -1272,6 +1360,7 @@
       this._placeInSlot(a, bShelf, bSlot);
       this._placeInSlot(b, aShelf, aSlot);
     },
+
     _slotRect(shelfIndex, slotIndex) {
       const shelf = this.shelves[shelfIndex];
       const N = this.params.slotsPerShelf;
@@ -1283,6 +1372,7 @@
       const cy = shelf.y - objectH * 0.5 - 4;
       return { cx, cy, w: objectW, h: objectH };
     },
+
     _shelfIndexAt(px, py) {
       for (let s = 0; s < this.shelves.length; s++) {
         const shelf = this.shelves[s];
@@ -1294,6 +1384,7 @@
       }
       return -1;
     },
+
     _nearestSlotIndex(shelfIndex, x) {
       const shelf = this.shelves[shelfIndex];
       const N = this.params.slotsPerShelf;
@@ -1301,6 +1392,7 @@
       const rel = (x - shelf.left) / slotW;
       return Math.min(N - 1, Math.max(0, Math.floor(rel)));
     },
+
     _nearestFreeSlot(shelfIndex, targetX) {
       const shelf = this.shelves[shelfIndex];
       const N = this.params.slotsPerShelf;
@@ -1314,23 +1406,26 @@
       }
       return -1;
     },
+
     hitItem(px, py) {
       for (let i = this.items.length - 1; i >= 0; i--) {
         const it = this.items[i];
         if (this.dragging && this.dragging.item === it) continue;
-        const factor = { w: 0.9, h: 0.9 };
+        const factor = { w: 1, h: 1 };
         const hw = (it.w * factor.w) / 2;
         const hh = (it.h * factor.h) / 2;
         if (Math.abs(px - it.x) <= hw && Math.abs(py - it.y) <= hh) return it;
       }
       return null;
     },
+
     _removeFromSlot(item) {
       for (let s = 0; s < this.shelves.length; s++) {
         const slots = this.shelves[s].slots;
         for (let i = 0; i < slots.length; i++) if (slots[i] === item) slots[i] = null;
       }
     },
+
     _placeInSlot(item, shelfIndex, slotIndex) {
       this._removeFromSlot(item);
       this.shelves[shelfIndex].slots[slotIndex] = item;
@@ -1339,6 +1434,7 @@
       const r = this._slotRect(shelfIndex, slotIndex);
       item.x = r.cx; item.y = r.cy; item.w = r.w; item.h = r.h;
     },
+
     onDown(pos) {
       if (this.complete || this.dragging) return;
       const item = this.hitItem(pos.x, pos.y);
@@ -1352,12 +1448,14 @@
       playSlide();
       if (navigator.vibrate) { try { navigator.vibrate(10); } catch (e) {} }
     },
+
     onMove(pos) {
       if (!this.dragging) return;
       const it = this.dragging.item;
       it.x = pos.x + this.dragging.offsetX;
       it.y = pos.y + this.dragging.offsetY;
     },
+
     onUp(pos) {
       if (!this.dragging) return;
       const it = this.dragging.item;
@@ -1380,6 +1478,7 @@
       this.returning.push({ item: it, fromX: it.x, fromY: it.y, toX: home.cx, toY: home.cy, t: 0, homeShelfIndex: fromShelf, homeSlotIndex: fromSlot });
       playSound(300, 0.15);
     },
+
     _currentPairKeys() {
       const keys = new Set();
       for (let s = 0; s < this.shelves.length; s++) {
@@ -1394,22 +1493,18 @@
       }
       return keys;
     },
+
     _detectNewPairs() {
       const current = this._currentPairKeys();
       const prev = this._prevPairs;
       for (const key of current) {
         if (!prev.has(key) && !this._scoredPairs.has(key)) {
-          const pairId = Number(key.split(':')[1]);
-          const kind = this._findPairKind(pairId);
-          const family = this._findPairFamily(pairId);
           if (this._zen) {
-            if (kind === 'presente') playGiftSound();
-            else if (kind === 'estrela') playBonus();
-            else playSnapByFamily(family);
+            playSound(900, 0.10);
           } else {
-            if (kind === 'estrela') { this.scoreThisPhase += CONFIG.POINTS_STAR; this._statStar++; playBonus(); if (!this._daily) tryUnlock('star'); }
-            else if (kind === 'presente') { this.scoreThisPhase += CONFIG.POINTS_GIFT; this._statGift++; playGiftSound(); if (!this._daily) tryUnlock('gift'); }
-            else { this.scoreThisPhase += CONFIG.POINTS_NORMAL; this._statNormal++; playSnapByFamily(family); }
+            this.scoreThisPhase += CONFIG.POINTS_NORMAL;
+            this._statNormal++;
+            playSound(900, 0.10);
           }
           this.pairsFormed++;
           this._scoredPairs.add(key);
@@ -1417,14 +1512,7 @@
       }
       this._prevPairs = current;
     },
-    _findPairKind(pairId) {
-      for (const it of this.items) if (it.pairId === pairId) return it.kind;
-      return 'normal';
-    },
-    _findPairFamily(pairId) {
-      for (const it of this.items) if (it.pairId === pairId) return CONFIG.OBJECT_FAMILY[it.type] || 'mid';
-      return 'mid';
-    },
+
     _isComplete() {
       const pairCount = new Map();
       for (const it of this.items) pairCount.set(it.pairId, (pairCount.get(it.pairId) || 0) + 1);
@@ -1450,6 +1538,7 @@
       }
       return true;
     },
+
     _checkCompletion() {
       if (this.complete || !this._isComplete()) return;
       this.complete = true;
@@ -1468,14 +1557,14 @@
       checkAchievementsAfterShelf();
       this._showWinOverlay(timeBonus);
     },
+
     _showWinOverlay(timeBonus) {
       winTitle.textContent = 'Prateleira pareada ✓';
       winOverlay.querySelector('.win-card').classList.remove('zen');
       winPoints.textContent = `+${this.scoreThisPhase} pontos`;
       const lines = [];
-      if (this._statNormal > 0) lines.push(`${this._statNormal} par(es) normal(is) → +${this._statNormal * CONFIG.POINTS_NORMAL}`);
-      if (this._statStar > 0) lines.push(`${this._statStar} estrela(s) → +${this._statStar * CONFIG.POINTS_STAR}`);
-      if (this._statGift > 0) lines.push(`${this._statGift} presente(s) → +${this._statGift * CONFIG.POINTS_GIFT}`);
+      if (this._statNormal > 0) lines.push(`${this._statNormal} par(es) → +${this._statNormal * CONFIG.POINTS_NORMAL}`);
+      if (this._tema) lines.push(`Tema: ${this._tema.emoji || ''} ${this._tema.nome}`);
       lines.push(`Bônus de fase → +${CONFIG.POINTS_PHASE_BONUS}`);
       if (timeBonus > 0) lines.push(`Bônus de tempo → +${timeBonus}`);
       winBreakdown.innerHTML = lines.join('<br>');
@@ -1485,6 +1574,7 @@
       void winOverlay.offsetWidth;
       winOverlay.classList.add('visible');
     },
+
     update(dt) {
       this._pulseTime += dt;
       if (!this._zen && !this.complete && this.timeLeft > 0) this.timeLeft = Math.max(0, this.timeLeft - dt / 1000);
@@ -1504,6 +1594,7 @@
       for (const it of this.items) if (it.flash > 0) it.flash = Math.max(0, it.flash - dt);
       if (this.celebrationTimer > 0) this.celebrationTimer = Math.max(0, this.celebrationTimer - dt);
     },
+
     _slotPulseAlpha(shelfIndex, slotIndex) {
       if (!this.dragging) return 0;
       const it = this.dragging.item;
@@ -1517,10 +1608,23 @@
       const pulse = 0.5 + 0.5 * Math.sin(this._pulseTime / 200);
       return base * pulse;
     },
+
     draw() {
       ctx.fillStyle = CONFIG.BACKGROUND;
       ctx.fillRect(0, 0, W, H);
       const N = this.params.slotsPerShelf;
+
+      // Título do tema (topo)
+      if (this._tema) {
+        ctx.save();
+        ctx.font = '500 13px system-ui, sans-serif';
+        ctx.fillStyle = 'rgba(160, 82, 45, 0.85)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText(`Tema: ${this._tema.emoji || ''} ${this._tema.nome}`, W / 2, H * 0.04);
+        ctx.restore();
+      }
+
       for (let s = 0; s < this.shelves.length; s++) {
         const shelf = this.shelves[s];
         ctx.fillStyle = 'rgba(139, 69, 19, 0.28)';
@@ -1554,6 +1658,7 @@
           }
         }
       }
+
       for (const it of this.items) {
         if (this.dragging && this.dragging.item === it) continue;
         this._drawItem(it);
@@ -1566,6 +1671,7 @@
         this._drawItem(this.dragging.item);
         ctx.restore();
       }
+
       for (let s = 0; s < this.shelves.length; s++) {
         const shelf = this.shelves[s];
         const N2 = shelf.slots.length;
@@ -1594,29 +1700,19 @@
         drawCelebrationWave(p);
       }
     },
+
     _drawItem(item) {
       ctx.save();
       ctx.translate(item.x, item.y);
-      ctx.scale(item.scale, item.scale);
-      ctx.shadowColor = CONFIG.SHADOW;
-      ctx.shadowBlur = 6; ctx.shadowOffsetY = 3;
-      if (item.type === 'estrela' || item.type === 'presente') {
-        ctx.save();
-        const haloR = Math.min(item.w, item.h) * 0.8;
-        const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, haloR);
-        const baseColor = item.type === 'estrela' ? '#FFD54F' : '#F06292';
-        grad.addColorStop(0, hexToRgba(baseColor, 0.55));
-        grad.addColorStop(1, hexToRgba(baseColor, 0));
-        ctx.fillStyle = grad;
-        ctx.beginPath(); ctx.arc(0, 0, haloR, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
-      }
-      drawObjectShape(item.type, item.w, item.h, item.palette);
+      ctx.scale(item.scale * (item.visualScale || 1), item.scale * (item.visualScale || 1));
+      drawFramedImage(item.image, item.w, item.h);
       ctx.restore();
     },
   };
 
-  /* CENA: FIOS */
+  /* ============================================================
+     CENA: FIOS
+     ============================================================ */
   function createThread(index, color, threadCount, nodesPerThread, isElectric) {
     const margin = CONFIG.THREAD_MARGIN;
     const usableW = W - 2 * margin;
@@ -1635,6 +1731,7 @@
     resampleThread(thread);
     return thread;
   }
+
   function resampleThread(thread) {
     const pts = [thread.endpoints[0], ...thread.nodes, thread.endpoints[1]];
     const step = CONFIG.THREAD_SAMPLE_STEP;
@@ -1691,6 +1788,7 @@
       this._updateCleanStates();
       this._prevClean = new Set(this.threads.map((t, i) => t.isClean ? i : -1).filter(i => i >= 0));
     },
+
     _updateCleanStates() {
       const N = this.threads.length;
       for (let i = 0; i < N; i++) {
@@ -1702,11 +1800,13 @@
         this.threads[i].isClean = !crosses;
       }
     },
+
     _cleanIndices() {
       const list = [];
       for (let i = 0; i < this.threads.length; i++) if (this.threads[i].isClean) list.push(i);
       return list;
     },
+
     _detectNewClean() {
       this._updateCleanStates();
       const currentClean = new Set(this._cleanIndices());
@@ -1726,6 +1826,7 @@
       }
       this._prevClean = currentClean;
     },
+
     update(dt) {
       if (!this._zen && !this.complete && this.timeLeft > 0) this.timeLeft = Math.max(0, this.timeLeft - dt / 1000);
       if (this.celebrationTimer > 0) this.celebrationTimer = Math.max(0, this.celebrationTimer - dt);
@@ -1737,6 +1838,7 @@
         if (thread.cleanPulse > 0) thread.cleanPulse = Math.max(0, thread.cleanPulse - dt);
       }
     },
+
     draw() {
       ctx.fillStyle = CONFIG.BACKGROUND;
       ctx.fillRect(0, 0, W, H);
@@ -1746,6 +1848,7 @@
         drawCelebrationWave(p);
       }
     },
+
     _drawThread(thread) {
       const pts = [thread.endpoints[0], ...thread.nodes, thread.endpoints[1]];
       const pulse = thread.cleanPulse > 0 ? (thread.cleanPulse / 600) : 0;
@@ -1851,6 +1954,7 @@
       }
       ctx.restore();
     },
+
     onDown(pos) {
       if (this.complete) return;
       let best = null, bestDist = Infinity;
@@ -1869,6 +1973,7 @@
         if (navigator.vibrate) { try { navigator.vibrate(10); } catch (e) {} }
       }
     },
+
     onMove(pos) {
       if (!this.dragging) return;
       const { threadIndex, nodeIndex } = this.dragging;
@@ -1879,7 +1984,9 @@
       this._detectNewClean();
       this._checkCompletion();
     },
+
     onUp() { this.dragging = null; },
+
     _checkCompletion() {
       if (this.complete) return;
       for (const t of this.threads) if (!t.isClean) return;
@@ -1899,6 +2006,7 @@
       checkAchievementsAfterThreads();
       this._showWinOverlay(timeBonus);
     },
+
     _showWinOverlay(timeBonus) {
       winTitle.textContent = 'Fios desembaraçados ✓';
       winOverlay.querySelector('.win-card').classList.remove('zen');
@@ -1915,6 +2023,7 @@
       void winOverlay.offsetWidth;
       winOverlay.classList.add('visible');
     },
+
     _threadsCross(a, b) {
       const sa = a.samples, sb = b.samples;
       for (let i = 0; i < sa.length - 1; i++) {
@@ -1930,13 +2039,513 @@
     },
   };
 
+   /* ============================================================
+     CENA: GAVETA (com temas de imagens)
+     ============================================================ */
+  const DrawerScene = {
+    drawers: [], items: [], dragging: null, returning: [],
+    complete: false, celebrationTimer: 0,
+    params: null, _nextId: 1,
+    timeLeft: 0, scoreThisPhase: 0,
+    _scoredMoves: new Set(),
+    _completedDrawers: new Set(),
+    _statMoves: 0,
+    _statDrawers: 0,
+    _timeBonus: 0,
+    _zen: false, _daily: false,
+    _temaPorGaveta: [],
+
+    reset() {
+      this.params = getDrawerParams();
+      this._zen = !!this.params.zen;
+      this._daily = !!this.params.daily;
+      this.drawers = [];
+      this.items = [];
+      this.dragging = null;
+      this.returning = [];
+      this.complete = false;
+      this.celebrationTimer = 0;
+      this._nextId = 1;
+      this.timeLeft = this.params.timeLimit;
+      this.scoreThisPhase = 0;
+      this._scoredMoves = new Set();
+      this._completedDrawers = new Set();
+      this._statMoves = 0;
+      this._statDrawers = 0;
+      this._timeBonus = 0;
+      this._temaPorGaveta = [];
+
+      const numDrawers = this.params.drawers;
+      const compartments = this.params.compartments;
+      const temasN = Math.min(numDrawers, this.params.temas, ImageLoader.temas.length);
+
+      if (temasN === 0) {
+        console.error('[Drawer] Nenhum tema carregado');
+        return;
+      }
+
+      const temasSorteados = ImageLoader.nTemasAleatorios(temasN);
+      this._temaPorGaveta = temasSorteados;
+
+      const topMargin = H * 0.20;
+      const bottomMargin = H * 0.14;
+      const usableH = H - topMargin - bottomMargin;
+      const drawerWidth = W * 0.90;
+      const drawerLeft = (W - drawerWidth) / 2;
+      const gap = usableH * 0.06;
+      const totalGaps = (numDrawers - 1) * gap;
+      const drawerHeight = Math.max(30, (usableH - totalGaps) / numDrawers);
+
+      for (let d = 0; d < numDrawers; d++) {
+        const y = topMargin + d * (drawerHeight + gap);
+        this.drawers.push({
+          y, height: drawerHeight,
+          left: drawerLeft, width: drawerWidth,
+          slots: new Array(compartments).fill(null),
+        });
+      }
+
+      const objectsPerDrawer = compartments - 1;
+      const allItems = [];
+      for (let d = 0; d < numDrawers; d++) {
+        const tema = this._temaPorGaveta[d % this._temaPorGaveta.length];
+        const imgsDoTema = ImageLoader.sortearImagens(tema, objectsPerDrawer);
+        for (let k = 0; k < objectsPerDrawer; k++) {
+          allItems.push({
+            id: this._nextId++,
+            image: imgsDoTema[k],
+            temaId: tema.id,
+            temaEmoji: tema.emoji || '',
+            temaNome: tema.nome,
+          });
+        }
+      }
+
+      for (let i = allItems.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [allItems[i], allItems[j]] = [allItems[j], allItems[i]];
+      }
+
+      const emptyPerDrawer = new Set();
+      for (let d = 0; d < numDrawers; d++) {
+        const slotToEmpty = Math.floor(rng() * compartments);
+        emptyPerDrawer.add(`${d}:${slotToEmpty}`);
+      }
+      const fillable = [];
+      for (let d = 0; d < numDrawers; d++) {
+        for (let k = 0; k < compartments; k++) {
+          if (!emptyPerDrawer.has(`${d}:${k}`)) fillable.push({ drawer: d, slot: k });
+        }
+      }
+      for (let i = fillable.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [fillable[i], fillable[j]] = [fillable[j], fillable[i]];
+      }
+      const numToPlace = Math.min(allItems.length, fillable.length);
+      for (let i = 0; i < numToPlace; i++) {
+        const item = allItems[i];
+        const { drawer, slot } = fillable[i];
+        item.scale = 1; item.flash = 0;
+        this._placeInSlot(item, drawer, slot);
+        this.items.push(item);
+      }
+
+      for (let d = 0; d < numDrawers; d++) {
+        if (this._drawerIsHomogeneous(d)) this._completedDrawers.add(d);
+      }
+
+      if (this._isComplete()) {
+        const a = this.items[Math.floor(rng() * this.items.length)];
+        let b = this.items[Math.floor(rng() * this.items.length)];
+        let tries = 0;
+        while ((b === a || b.drawerIndex === a.drawerIndex) && tries < 30) {
+          b = this.items[Math.floor(rng() * this.items.length)];
+          tries++;
+        }
+        this._swapItems(a, b);
+      }
+    },
+
+    _swapItems(a, b) {
+      const aD = a.drawerIndex, aS = a.slotIndex;
+      const bD = b.drawerIndex, bS = b.slotIndex;
+      this.drawers[aD].slots[aS] = null;
+      this.drawers[bD].slots[bS] = null;
+      this._placeInSlot(a, bD, bS);
+      this._placeInSlot(b, aD, aS);
+    },
+
+    _slotRect(drawerIndex, slotIndex) {
+      const drawer = this.drawers[drawerIndex];
+      const N = this.params.compartments;
+      const slotW = drawer.width / N;
+      const cx = drawer.left + slotW * (slotIndex + 0.5);
+      const objectH = drawer.height * 0.72;
+      const objectW = slotW * 0.62;
+      const cy = drawer.y + drawer.height * 0.5;
+      return { cx, cy, w: objectW, h: objectH };
+    },
+
+    _drawerIndexAt(px, py) {
+      for (let d = 0; d < this.drawers.length; d++) {
+        const dr = this.drawers[d];
+        if (px < dr.left || px > dr.left + dr.width) continue;
+        if (py >= dr.y && py <= dr.y + dr.height) return d;
+      }
+      return -1;
+    },
+
+    _nearestSlotIndex(drawerIndex, x) {
+      const drawer = this.drawers[drawerIndex];
+      const N = this.params.compartments;
+      const slotW = drawer.width / N;
+      const rel = (x - drawer.left) / slotW;
+      return Math.min(N - 1, Math.max(0, Math.floor(rel)));
+    },
+
+    _nearestFreeSlot(drawerIndex, targetX) {
+      const drawer = this.drawers[drawerIndex];
+      const N = this.params.compartments;
+      const start = this._nearestSlotIndex(drawerIndex, targetX);
+      if (drawer.slots[start] === null) return start;
+      for (let d = 1; d < N; d++) {
+        const left = start - d;
+        const right = start + d;
+        if (left >= 0 && drawer.slots[left] === null) return left;
+        if (right < N && drawer.slots[right] === null) return right;
+      }
+      return -1;
+    },
+
+    hitItem(px, py) {
+      for (let i = this.items.length - 1; i >= 0; i--) {
+        const it = this.items[i];
+        if (this.dragging && this.dragging.item === it) continue;
+        if (Math.abs(px - it.x) <= it.w / 2 && Math.abs(py - it.y) <= it.h / 2) {
+          return it;
+        }
+      }
+      return null;
+    },
+
+    _removeFromSlot(item) {
+      for (let d = 0; d < this.drawers.length; d++) {
+        const slots = this.drawers[d].slots;
+        for (let i = 0; i < slots.length; i++) {
+          if (slots[i] === item) slots[i] = null;
+        }
+      }
+    },
+
+    _placeInSlot(item, drawerIndex, slotIndex) {
+      this._removeFromSlot(item);
+      this.drawers[drawerIndex].slots[slotIndex] = item;
+      item.drawerIndex = drawerIndex;
+      item.slotIndex = slotIndex;
+      const r = this._slotRect(drawerIndex, slotIndex);
+      item.x = r.cx; item.y = r.cy; item.w = r.w; item.h = r.h;
+    },
+
+    onDown(pos) {
+      if (this.complete || this.dragging) return;
+      const item = this.hitItem(pos.x, pos.y);
+      if (!item) return;
+      const fromDrawerIndex = item.drawerIndex;
+      const fromSlotIndex = item.slotIndex;
+      this._removeFromSlot(item);
+      this.dragging = { item, offsetX: item.x - pos.x, offsetY: item.y - pos.y, fromDrawerIndex, fromSlotIndex };
+      const idx = this.items.indexOf(item);
+      if (idx >= 0) { this.items.splice(idx, 1); this.items.push(item); }
+      playSlide();
+      if (navigator.vibrate) { try { navigator.vibrate(10); } catch (e) {} }
+    },
+
+    onMove(pos) {
+      if (!this.dragging) return;
+      const it = this.dragging.item;
+      it.x = pos.x + this.dragging.offsetX;
+      it.y = pos.y + this.dragging.offsetY;
+    },
+
+    onUp(pos) {
+      if (!this.dragging) return;
+      const it = this.dragging.item;
+      const fromDrawer = this.dragging.fromDrawerIndex;
+      const fromSlot = this.dragging.fromSlotIndex;
+      this.dragging = null;
+
+      const targetDrawer = this._drawerIndexAt(it.x, it.y);
+      if (targetDrawer >= 0) {
+        const freeSlot = this._nearestFreeSlot(targetDrawer, it.x);
+        if (freeSlot >= 0) {
+          this._placeInSlot(it, targetDrawer, freeSlot);
+          playSound(700, 0.10);
+          if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e) {} }
+          this._detectNewCorrectItems();
+          this._checkDrawersHomogeneous();
+          this._checkCompletion();
+          return;
+        }
+      }
+
+      const home = this._slotRect(fromDrawer, fromSlot);
+      this.returning.push({
+        item: it,
+        fromX: it.x, fromY: it.y,
+        toX: home.cx, toY: home.cy,
+        t: 0,
+        homeDrawerIndex: fromDrawer,
+        homeSlotIndex: fromSlot,
+      });
+      playSound(300, 0.15);
+    },
+
+    _drawerIsHomogeneous(d) {
+      const slots = this.drawers[d].slots;
+      const temas = new Set();
+      for (const it of slots) {
+        if (!it) continue;
+        temas.add(it.temaId);
+      }
+      return temas.size <= 1;
+    },
+
+    _detectNewCorrectItems() {
+      if (this._zen) return;
+      for (let d = 0; d < this.drawers.length; d++) {
+        const slots = this.drawers[d].slots;
+        const temaDaGaveta = this._temaPorGaveta[d % this._temaPorGaveta.length];
+        if (!temaDaGaveta) continue;
+        for (const it of slots) {
+          if (!it) continue;
+          if (it.temaId !== temaDaGaveta.id) continue;
+          const key = `i${it.id}`;
+          if (!this._scoredMoves.has(key)) {
+            this._scoredMoves.add(key);
+            this.scoreThisPhase += CONFIG.DRAWER_POINTS_MOVE;
+            this._statMoves++;
+          }
+        }
+      }
+    },
+
+    _checkDrawersHomogeneous() {
+      if (this._zen) return;
+      for (let d = 0; d < this.drawers.length; d++) {
+        if (this._completedDrawers.has(d)) continue;
+        const slots = this.drawers[d].slots;
+        let full = true;
+        for (const s of slots) if (!s) { full = false; break; }
+        if (!full) continue;
+        if (!this._drawerIsHomogeneous(d)) continue;
+        this._completedDrawers.add(d);
+        this.scoreThisPhase += CONFIG.DRAWER_POINTS_DRAWER;
+        this._statDrawers++;
+        playDrawerDone();
+        if (navigator.vibrate) { try { navigator.vibrate([20, 30, 20]); } catch (e) {} }
+      }
+    },
+
+    _isComplete() {
+      for (let d = 0; d < this.drawers.length; d++) {
+        if (!this._drawerIsHomogeneous(d)) return false;
+      }
+      const seen = new Set();
+      for (const dr of this.drawers) {
+        for (const s of dr.slots) {
+          if (!s) continue;
+          if (seen.has(s)) return false;
+          seen.add(s);
+        }
+      }
+      if (seen.size !== this.items.length) return false;
+      return true;
+    },
+
+    _checkCompletion() {
+      if (this.complete || !this._isComplete()) return;
+      this.complete = true;
+      this.celebrationTimer = CONFIG.CELEBRATION_DURATION;
+      playComplete();
+      if (navigator.vibrate) { try { navigator.vibrate(50); } catch (e) {} }
+      if (this._zen) { setStatus('Zen concluído 🌿', true); return; }
+      if (this._daily) { finishDailyAttempt(this.scoreThisPhase); return; }
+      setStatus('Gaveta organizada ✓', true);
+      this.scoreThisPhase += CONFIG.DRAWER_POINTS_PHASE;
+      const timeBonus = Math.floor(this.timeLeft) * CONFIG.POINTS_PER_SECOND_LEFT;
+      this.scoreThisPhase += timeBonus;
+      this._timeBonus = timeBonus;
+      Progress.increment('drawer');
+      Progress.addScore(this.scoreThisPhase);
+      checkAchievementsAfterDrawer();
+      this._showWinOverlay(timeBonus);
+    },
+
+    _showWinOverlay(timeBonus) {
+      winTitle.textContent = 'Gaveta organizada ✓';
+      winOverlay.querySelector('.win-card').classList.remove('zen');
+      winPoints.textContent = `+${this.scoreThisPhase} pontos`;
+      const lines = [];
+      if (this._statMoves > 0) lines.push(`${this._statMoves} imagem(ns) no tema certo → +${this._statMoves * CONFIG.DRAWER_POINTS_MOVE}`);
+      if (this._statDrawers > 0) lines.push(`${this._statDrawers} gaveta(s) completa(s) → +${this._statDrawers * CONFIG.DRAWER_POINTS_DRAWER}`);
+      const temasNome = this._temaPorGaveta.map(t => `${t.emoji || ''} ${t.nome}`).join(' · ');
+      if (temasNome) lines.push(`Temas: ${temasNome}`);
+      lines.push(`Bônus de fase → +${CONFIG.DRAWER_POINTS_PHASE}`);
+      if (timeBonus > 0) lines.push(`Bônus de tempo → +${timeBonus}`);
+      winBreakdown.innerHTML = lines.join('<br>');
+      winTotal.textContent = `Total: ${Progress.data.score} pontos`;
+      winOverlay.classList.remove('hidden');
+      winOverlay.style.display = 'flex';
+      void winOverlay.offsetWidth;
+      winOverlay.classList.add('visible');
+    },
+
+    update(dt) {
+      if (!this._zen && !this.complete && this.timeLeft > 0) {
+        this.timeLeft = Math.max(0, this.timeLeft - dt / 1000);
+      }
+      for (let i = this.returning.length - 1; i >= 0; i--) {
+        const r = this.returning[i];
+        r.t += dt / CONFIG.RETURN_DURATION;
+        if (r.t >= 1) {
+          r.t = 1;
+          this._placeInSlot(r.item, r.homeDrawerIndex, r.homeSlotIndex);
+          this.returning.splice(i, 1);
+          continue;
+        }
+        const e = 1 - Math.pow(1 - r.t, 3);
+        r.item.x = lerp(r.fromX, r.toX, e);
+        r.item.y = lerp(r.fromY, r.toY, e);
+      }
+      for (const it of this.items) if (it.flash > 0) it.flash = Math.max(0, it.flash - dt);
+      if (this.celebrationTimer > 0) this.celebrationTimer = Math.max(0, this.celebrationTimer - dt);
+    },
+
+    draw() {
+      ctx.fillStyle = CONFIG.BACKGROUND;
+      ctx.fillRect(0, 0, W, H);
+      const N = this.params.compartments;
+
+      for (let d = 0; d < this.drawers.length; d++) {
+        const dr = this.drawers[d];
+        const homogeneous = this._drawerIsHomogeneous(d);
+        const temaDaGaveta = this._temaPorGaveta[d % this._temaPorGaveta.length];
+
+        ctx.fillStyle = CONFIG.DRAWER_WOOD_DARK;
+        roundRect(dr.left, dr.y, dr.width, dr.height, 8);
+        ctx.fill();
+
+        const innerPad = 6;
+        const innerX = dr.left + innerPad;
+        const innerY = dr.y + innerPad;
+        const innerW = dr.width - innerPad * 2;
+        const innerH = dr.height - innerPad * 2;
+        ctx.fillStyle = homogeneous
+          ? 'rgba(127, 168, 127, 0.10)'
+          : CONFIG.DRAWER_WOOD;
+        roundRect(innerX, innerY, innerW, innerH, 6);
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(61, 50, 41, 0.35)';
+        ctx.lineWidth = 1.5;
+        const slotW = dr.width / N;
+        for (let i = 1; i < N; i++) {
+          const x = dr.left + slotW * i;
+          ctx.beginPath();
+          ctx.moveTo(x, dr.y + 8);
+          ctx.lineTo(x, dr.y + dr.height - 8);
+          ctx.stroke();
+        }
+
+        // Rótulo do tema da gaveta (canto esquerdo, encima da madeira)
+        if (temaDaGaveta) {
+          ctx.save();
+          ctx.font = '500 11px system-ui, sans-serif';
+          ctx.fillStyle = homogeneous ? '#3D6B3D' : 'rgba(244, 237, 228, 0.85)';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          ctx.fillText(`${temaDaGaveta.emoji || ''} ${temaDaGaveta.nome}`,
+                       dr.left + 10, dr.y + 4);
+          ctx.restore();
+        }
+
+        ctx.strokeStyle = homogeneous
+          ? CONFIG.DRAWER_DONE
+          : 'rgba(61, 50, 41, 0.55)';
+        ctx.lineWidth = homogeneous ? 2.5 : 1.5;
+        roundRect(dr.left, dr.y, dr.width, dr.height, 8);
+        ctx.stroke();
+
+        for (let i = 0; i < N; i++) {
+          if (dr.slots[i] === null) {
+            const r = this._slotRect(d, i);
+            const destacado = !!this.dragging;
+            ctx.save();
+            ctx.setLineDash([4, 3]);
+            ctx.strokeStyle = destacado
+              ? CONFIG.SLOT_HIGHLIGHT
+              : 'rgba(244, 237, 228, 0.35)';
+            ctx.lineWidth = destacado ? 2 : 1.2;
+            roundRect(r.cx - r.w / 2, r.cy - r.h / 2, r.w, r.h, 5);
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+
+        if (homogeneous) {
+          ctx.save();
+          ctx.strokeStyle = hexToRgba(CONFIG.DRAWER_DONE, 0.45);
+          ctx.lineWidth = 6;
+          ctx.lineJoin = 'round';
+          roundRect(dr.left + 2, dr.y + 2, dr.width - 4, dr.height - 4, 8);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      for (const it of this.items) {
+        if (this.dragging && this.dragging.item === it) continue;
+        this._drawItem(it);
+      }
+      if (this.dragging) {
+        ctx.save();
+        ctx.globalAlpha = 0.92;
+        ctx.shadowColor = CONFIG.SHADOW;
+        ctx.shadowBlur = 14; ctx.shadowOffsetY = 6;
+        this._drawItem(this.dragging.item);
+        ctx.restore();
+      }
+
+      if (this.celebrationTimer > 0) {
+        const p = 1 - this.celebrationTimer / CONFIG.CELEBRATION_DURATION;
+        drawCelebrationWave(p);
+      }
+    },
+
+    _drawItem(item) {
+      ctx.save();
+      ctx.translate(item.x, item.y);
+      ctx.scale(item.scale, item.scale);
+      ctx.shadowColor = CONFIG.SHADOW;
+      ctx.shadowBlur = 5;
+      ctx.shadowOffsetY = 2;
+      drawFramedImage(item.image, item.w, item.h);
+      ctx.restore();
+    },
+  };
+
+  /* ============================================================
+     LOOP E NAVEGAÇÃO
+     ============================================================ */
   function updateCurrentScene(dt) {
     if (currentScene === 'shelf') ShelfScene.update(dt);
     else if (currentScene === 'threads') ThreadsScene.update(dt);
+    else if (currentScene === 'drawer') DrawerScene.update(dt);
   }
   function drawCurrentScene() {
     if (currentScene === 'shelf') ShelfScene.draw();
     else if (currentScene === 'threads') ThreadsScene.draw();
+    else if (currentScene === 'drawer') DrawerScene.draw();
     else { ctx.fillStyle = CONFIG.BACKGROUND; ctx.fillRect(0, 0, W, H); }
   }
   function loop(timestamp) {
@@ -1948,6 +2557,7 @@
     updateHUD();
     requestAnimationFrame(loop);
   }
+
   function updateHUD() {
     if (currentScene === 'shelf') {
       const p = ShelfScene.params;
@@ -2023,6 +2633,43 @@
       hudTimer.classList.toggle('danger', t <= 15);
       hudScore.textContent = `⭐ ${Progress.data.score + ThreadsScene.scoreThisPhase}`;
       hudScore.classList.remove('hidden');
+    } else if (currentScene === 'drawer') {
+      const p = DrawerScene.params;
+      if (p.zen) {
+        hudLevel.textContent = '🌿 Zen';
+        hudLevel.classList.remove('hidden');
+        hudPairs.classList.add('hidden');
+        hudTimer.classList.add('hidden');
+        hudScore.classList.add('hidden');
+        return;
+      }
+      if (p.daily) {
+        hudLevel.textContent = '🎯 Desafio';
+        hudLevel.classList.remove('hidden');
+        const done = DrawerScene._completedDrawers.size;
+        const total = DrawerScene.drawers.length;
+        hudPairs.textContent = `Gavetas: ${done}/${total}`;
+        hudPairs.classList.remove('hidden');
+        const t = Math.max(0, Math.ceil(DrawerScene.timeLeft));
+        hudTimer.textContent = `⏱ ${t}s`;
+        hudTimer.classList.remove('hidden');
+        hudTimer.classList.toggle('danger', t <= 15);
+        hudScore.textContent = `⭐ ${DrawerScene.scoreThisPhase}`;
+        hudScore.classList.remove('hidden');
+        return;
+      }
+      hudLevel.textContent = `Nível ${p.level}`;
+      hudLevel.classList.remove('hidden');
+      const done = DrawerScene._completedDrawers.size;
+      const total = DrawerScene.drawers.length;
+      hudPairs.textContent = `Gavetas: ${done}/${total}`;
+      hudPairs.classList.remove('hidden');
+      const t = Math.max(0, Math.ceil(DrawerScene.timeLeft));
+      hudTimer.textContent = `⏱ ${t}s`;
+      hudTimer.classList.remove('hidden');
+      hudTimer.classList.toggle('danger', t <= 15);
+      hudScore.textContent = `⭐ ${Progress.data.score + DrawerScene.scoreThisPhase}`;
+      hudScore.classList.remove('hidden');
     } else {
       hudLevel.classList.add('hidden');
       hudPairs.classList.add('hidden');
@@ -2043,27 +2690,33 @@
     const pos = getPos(e);
     if (currentScene === 'shelf') ShelfScene.onDown(pos);
     else if (currentScene === 'threads') ThreadsScene.onDown(pos);
+    else if (currentScene === 'drawer') DrawerScene.onDown(pos);
   }
   function onMove(e) {
     if (e.cancelable) e.preventDefault();
     const pos = getPos(e);
     if (currentScene === 'shelf') ShelfScene.onMove(pos);
     else if (currentScene === 'threads') ThreadsScene.onMove(pos);
+    else if (currentScene === 'drawer') DrawerScene.onMove(pos);
   }
   function onUp(e) {
     const pos = e ? getPos(e) : null;
     if (currentScene === 'shelf') ShelfScene.onUp(pos);
     else if (currentScene === 'threads') ThreadsScene.onUp();
+    else if (currentScene === 'drawer') DrawerScene.onUp(pos);
   }
 
   function updateMenuCounters() {
     const s = Progress.data.shelf;
     const t = Progress.data.threads;
+    const d = Progress.data.drawer;
     countShelf.textContent = s === 0 ? 'novo' : `Nível ${Math.min(s + 1, CONFIG.SHELF_LEVELS.length)}`;
     countShelf.classList.toggle('empty', s === 0);
     countThreads.textContent = t === 0 ? 'novo' : `Nível ${Math.min(t + 1, CONFIG.THREAD_LEVELS.length)}`;
     countThreads.classList.toggle('empty', t === 0);
-    // Botão do desafio: mostrar streak ou "novo"
+    countDrawer.textContent = d === 0 ? 'novo' : `Nível ${Math.min(d + 1, CONFIG.DRAWER_LEVELS.length)}`;
+    countDrawer.classList.toggle('empty', d === 0);
+
     const streak = Progress.data.daily.streak;
     const today = Progress.data.daily.today;
     btnDaily.classList.remove('done', 'streak');
@@ -2115,11 +2768,8 @@
     fadeCanvas(() => {
       currentScene = null;
       menuEl.classList.remove('hidden');
+      menuExtrasEl.classList.remove('hidden');
       gameAreaEl.classList.add('hidden');
-      btnReset.classList.remove('hidden');
-      btnAchievements.classList.remove('hidden');
-      btnDailyPanel.classList.remove('hidden');
-      btnHelp.classList.remove('hidden');
       setStatus('Escolha uma mecânica', false);
       updateMenuCounters();
       updateMuteButton();
@@ -2137,11 +2787,8 @@
     dailySeedRng = null;
     dailyMechanic = null;
     menuEl.classList.add('hidden');
+    menuExtrasEl.classList.add('hidden');
     gameAreaEl.classList.remove('hidden');
-    btnReset.classList.add('hidden');
-    btnAchievements.classList.add('hidden');
-    btnDailyPanel.classList.add('hidden');
-    btnHelp.classList.add('hidden');
     const size = setupCanvas();
     W = size.width; H = size.height;
     currentScene = which;
@@ -2153,6 +2800,10 @@
       ThreadsScene.reset();
       btnNew.textContent = zenMode ? 'Nova fase Zen' : 'Novos fios';
       setStatus(zenMode ? 'Zen 🌿' : 'Arraste os nós até nenhum fio se cruzar', false);
+    } else if (which === 'drawer') {
+      DrawerScene.reset();
+      btnNew.textContent = zenMode ? 'Nova fase Zen' : 'Nova gaveta';
+      setStatus(zenMode ? 'Zen 🌿' : 'Organize cada gaveta por tema', false);
     }
     updateMuteButton();
     updateAmbientButton();
@@ -2162,11 +2813,11 @@
   }
 
   function showZen() {
-    const which = Math.random() < 0.5 ? 'shelf' : 'threads';
+    const opts = ['shelf', 'threads', 'drawer'];
+    const which = opts[Math.floor(Math.random() * opts.length)];
     showGame(which, true);
   }
 
-  /** Inicia o Desafio do Dia. */
   function showDaily() {
     Progress.ensureTodayReset();
     if (Progress.data.daily.today.attemptsUsed >= CONFIG.DAILY_MAX_ATTEMPTS) {
@@ -2180,7 +2831,6 @@
     dailyMode = true;
     zenMode = false;
 
-    // Seed determinística pela data (mais o número da tentativa não — a fase é a mesma)
     const seed = hashString('daily-' + tk);
     dailySeedRng = mulberry32(seed);
 
@@ -2188,11 +2838,8 @@
     hideDailyWinOverlay();
     closeAllHelps();
     menuEl.classList.add('hidden');
+    menuExtrasEl.classList.add('hidden');
     gameAreaEl.classList.remove('hidden');
-    btnReset.classList.add('hidden');
-    btnAchievements.classList.add('hidden');
-    btnDailyPanel.classList.add('hidden');
-    btnHelp.classList.add('hidden');
     const size = setupCanvas();
     W = size.width; H = size.height;
     currentScene = mech;
@@ -2202,10 +2849,14 @@
       ShelfScene.reset();
       btnNew.textContent = '🎯 Reiniciar';
       setStatus('🎯 Desafio do dia — Prateleira', false);
-    } else {
+    } else if (mech === 'threads') {
       ThreadsScene.reset();
       btnNew.textContent = '🎯 Reiniciar';
       setStatus('🎯 Desafio do dia — Fios', false);
+    } else {
+      DrawerScene.reset();
+      btnNew.textContent = '🎯 Reiniciar';
+      setStatus('🎯 Desafio do dia — Gaveta', false);
     }
     updateMuteButton();
     updateAmbientButton();
@@ -2214,10 +2865,10 @@
     requestAnimationFrame(() => { requestAnimationFrame(() => canvas.classList.remove('fading')); });
   }
 
-  /** Chamado quando o jogador completa uma tentativa do desafio. */
   function finishDailyAttempt(score) {
     const tk = todayKey();
     Progress.ensureTodayReset();
+    dailyAttemptScore = score;
 
     Progress.data.daily.today.attemptsUsed = Math.min(
       CONFIG.DAILY_MAX_ATTEMPTS,
@@ -2227,32 +2878,23 @@
       Progress.data.daily.today.bestScore = score;
     }
 
-    // Só marca como completed e atualiza streak se for a primeira vez que completa hoje
     const firstTimeToday = !Progress.data.daily.today.completed;
     if (firstTimeToday) {
       Progress.data.daily.today.completed = true;
-      // Atualiza streak
       const last = Progress.data.daily.lastCompletedDate;
-      if (last === tk) {
-        // já contava hoje (improvável, mas seguro)
-      } else {
-        // Calcula se é continuação
+      if (last !== tk) {
         if (last) {
           const d1 = new Date(tk + 'T12:00:00');
           const d2 = new Date(last + 'T12:00:00');
           const diffDays = Math.round((d1 - d2) / 86400000);
-          if (diffDays === 1) {
-            Progress.data.daily.streak += 1;
-          } else {
-            Progress.data.daily.streak = 1;
-          }
+          if (diffDays === 1) Progress.data.daily.streak += 1;
+          else Progress.data.daily.streak = 1;
         } else {
           Progress.data.daily.streak = 1;
         }
         Progress.data.daily.lastCompletedDate = tk;
       }
 
-      // Adiciona/atualiza no histórico (mantém só 7)
       Progress.data.daily.history.push({
         date: tk,
         mechanic: dailyMechanic,
@@ -2264,10 +2906,8 @@
         Progress.data.daily.history = Progress.data.daily.history.slice(-7);
       }
 
-      // Conquistas
       checkAchievementsAfterDaily();
     } else {
-      // Já tinha completado hoje — atualiza o histórico com o novo best
       const h = Progress.data.daily.history.find(e => e.date === tk);
       if (h) {
         h.bestScore = Progress.data.daily.today.bestScore;
@@ -2311,8 +2951,12 @@
     return { width: rect.width, height: rect.height };
   }
 
+  /* ============================================================
+     EVENTOS DOS BOTÕES
+     ============================================================ */
   btnShelf.addEventListener('click', () => showGame('shelf', false));
   btnThreads.addEventListener('click', () => showGame('threads', false));
+  btnDrawer.addEventListener('click', () => showGame('drawer', false));
   btnZen.addEventListener('click', () => showZen());
   btnDaily.addEventListener('click', () => showDaily());
   btnMenu.addEventListener('click', () => showMenu());
@@ -2333,16 +2977,10 @@
 
   btnNew.addEventListener('click', () => {
     if (dailyMode) {
-      // Reiniciar a fase do desafio (mesma seed) — mas NÃO gasta tentativa extra
-      // porque a tentativa só é contada ao COMPLETAR.
       dailySeedRng = mulberry32(hashString('daily-' + todayKey()));
-      if (currentScene === 'shelf') {
-        ShelfScene.reset();
-        setStatus('🎯 Desafio do dia — Prateleira', false);
-      } else {
-        ThreadsScene.reset();
-        setStatus('🎯 Desafio do dia — Fios', false);
-      }
+      if (currentScene === 'shelf') { ShelfScene.reset(); setStatus('🎯 Desafio do dia — Prateleira', false); }
+      else if (currentScene === 'threads') { ThreadsScene.reset(); setStatus('🎯 Desafio do dia — Fios', false); }
+      else if (currentScene === 'drawer') { DrawerScene.reset(); setStatus('🎯 Desafio do dia — Gaveta', false); }
       return;
     }
     if (currentScene === 'shelf') {
@@ -2351,18 +2989,17 @@
     } else if (currentScene === 'threads') {
       ThreadsScene.reset();
       setStatus(zenMode ? 'Zen 🌿' : 'Arraste os nós até nenhum fio se cruzar', false);
+    } else if (currentScene === 'drawer') {
+      DrawerScene.reset();
+      setStatus(zenMode ? 'Zen 🌿' : 'Organize cada gaveta por tema', false);
     }
   });
 
   btnNextLevel.addEventListener('click', () => {
     hideWinOverlay();
-    if (currentScene === 'shelf') {
-      ShelfScene.reset();
-      setStatus('Junte os pares lado a lado', false);
-    } else if (currentScene === 'threads') {
-      ThreadsScene.reset();
-      setStatus('Arraste os nós até nenhum fio se cruzar', false);
-    }
+    if (currentScene === 'shelf') { ShelfScene.reset(); setStatus('Junte os pares lado a lado', false); }
+    else if (currentScene === 'threads') { ThreadsScene.reset(); setStatus('Arraste os nós até nenhum fio se cruzar', false); }
+    else if (currentScene === 'drawer') { DrawerScene.reset(); setStatus('Organize cada gaveta por tema', false); }
   });
 
   btnShare.addEventListener('click', shareScore);
@@ -2371,16 +3008,11 @@
   btnDailyRetry.addEventListener('click', () => {
     hideDailyWinOverlay();
     if (Progress.data.daily.today.attemptsUsed >= CONFIG.DAILY_MAX_ATTEMPTS) return;
-    // Regenera a mesma fase (mesma seed) e deixa o jogador tentar de novo
     dailySeedRng = mulberry32(hashString('daily-' + todayKey()));
     dailyAttemptScore = 0;
-    if (currentScene === 'shelf') {
-      ShelfScene.reset();
-      setStatus('🎯 Desafio do dia — Prateleira', false);
-    } else if (currentScene === 'threads') {
-      ThreadsScene.reset();
-      setStatus('🎯 Desafio do dia — Fios', false);
-    }
+    if (currentScene === 'shelf') { ShelfScene.reset(); setStatus('🎯 Desafio do dia — Prateleira', false); }
+    else if (currentScene === 'threads') { ThreadsScene.reset(); setStatus('🎯 Desafio do dia — Fios', false); }
+    else if (currentScene === 'drawer') { DrawerScene.reset(); setStatus('🎯 Desafio do dia — Gaveta', false); }
   });
 
   btnDailyClose.addEventListener('click', () => {
@@ -2404,6 +3036,7 @@
   btnHelpGame.addEventListener('click', openContextHelp);
   btnCloseHelpShelf.addEventListener('click', closeHelpShelf);
   btnCloseHelpThreads.addEventListener('click', closeHelpThreads);
+  btnCloseHelpDrawer.addEventListener('click', closeHelpDrawer);
 
   btnAchievements.addEventListener('click', openAchievements);
   btnCloseAch.addEventListener('click', closeAchievements);
@@ -2411,14 +3044,17 @@
   btnDailyPanel.addEventListener('click', openDailyPanel);
   btnCloseDaily.addEventListener('click', closeDailyPanel);
 
-  function init() {
+  /* ============================================================
+     INIT — carrega imagens ANTES de mostrar o menu
+     ============================================================ */
+  async function init() {
     Progress.load();
     Progress.updateStreakIfNeeded();
     Progress.ensureTodayReset();
     updateMuteButton();
     updateAmbientButton();
 
-    const allPanels = [helpPanel, helpShelfPanel, helpThreadsPanel, achPanel, dailyPanel, winOverlay, dailyWinOverlay, toast];
+    const allPanels = [helpPanel, helpShelfPanel, helpThreadsPanel, helpDrawerPanel, achPanel, dailyPanel, winOverlay, dailyWinOverlay, toast];
     for (const p of allPanels) {
       p.classList.add('hidden');
       p.style.display = 'none';
@@ -2464,17 +3100,42 @@
             }
           }
         }
+      } else if (currentScene === 'drawer' && DrawerScene.params) {
+        const p = DrawerScene.params;
+        const numDrawers = p.drawers;
+        const topMargin = H * 0.20;
+        const bottomMargin = H * 0.14;
+        const usableH = H - topMargin - bottomMargin;
+        const drawerWidth = W * 0.90;
+        const drawerLeft = (W - drawerWidth) / 2;
+        const gap = usableH * 0.06;
+        const totalGaps = (numDrawers - 1) * gap;
+        const drawerHeight = Math.max(30, (usableH - totalGaps) / numDrawers);
+        for (let d = 0; d < numDrawers; d++) {
+          const y = topMargin + d * (drawerHeight + gap);
+          DrawerScene.drawers[d].y = y;
+          DrawerScene.drawers[d].height = drawerHeight;
+          DrawerScene.drawers[d].left = drawerLeft;
+          DrawerScene.drawers[d].width = drawerWidth;
+        }
+        for (let d = 0; d < numDrawers; d++) {
+          for (let k = 0; k < p.compartments; k++) {
+            const it = DrawerScene.drawers[d].slots[k];
+            if (it) {
+              const r = DrawerScene._slotRect(d, k);
+              it.x = r.cx; it.y = r.cy; it.w = r.w; it.h = r.h;
+            }
+          }
+        }
       }
     });
 
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        ambient.stop();
-      } else {
-        ambient.refresh(currentScene !== null);
-      }
+      if (document.hidden) ambient.stop();
+      else ambient.refresh(currentScene !== null);
     });
 
+    // Destrave de áudio no primeiro toque
     let audioUnlocked = false;
     function unlockAudioOnce() {
       if (audioUnlocked) return;
@@ -2500,6 +3161,18 @@
     document.addEventListener('mousedown', unlockAudioOnce, { passive: true });
     document.addEventListener('keydown', unlockAudioOnce);
     document.addEventListener('click', unlockAudioOnce);
+
+    // Carrega imagens ANTES de tudo
+    setStatus('Carregando imagens…', false);
+    await ImageLoader.carregar();
+
+    if (!ImageLoader.carregado || ImageLoader.temas.length === 0) {
+      setStatus('Erro ao carregar imagens. Verifique o imagens.json.', false);
+      console.error('[Init] ImageLoader falhou:', ImageLoader.erro);
+      return;
+    }
+
+    setStatus('Pronto!', false);
 
     showMenu();
     requestAnimationFrame(loop);

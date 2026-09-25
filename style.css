@@ -55,6 +55,11 @@ h1 {
   font-weight: 500;
 }
 
+/* Skeleton de loading no canvas */
+#game-area.loading #canvas {
+  opacity: 0.4;
+}
+
 #game-area {
   display: block;
 }
@@ -200,11 +205,11 @@ h1 {
   align-items: center;
 }
 
-.menu-row {
-  display: flex;
-  justify-content: center;
+.menu-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 12px;
-  flex-wrap: wrap;
+  width: 100%;
 }
 
 .menu-btn {
@@ -213,7 +218,7 @@ h1 {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  width: 140px;
+  width: 100%;
   height: 130px;
   font-family: inherit;
   font-size: 15px;
@@ -243,6 +248,13 @@ h1 {
 
 .menu-btn-zen:hover { background: #FFE0E8; }
 
+.menu-btn-drawer {
+  background: #F5F0E8;
+  border-color: rgba(139, 111, 71, 0.35);
+}
+
+.menu-btn-drawer:hover { background: #EDE4D5; }
+
 .menu-icon {
   font-size: 36px;
   line-height: 1;
@@ -250,6 +262,7 @@ h1 {
 }
 
 .menu-btn-zen .menu-icon { color: #E91E63; }
+.menu-btn-drawer .menu-icon { color: #8B6F47; }
 
 .menu-label { letter-spacing: 0.3px; }
 
@@ -263,16 +276,16 @@ h1 {
 
 .menu-count.empty { color: #C9A88C; font-weight: 400; }
 .menu-btn-zen .menu-count { color: #E91E63; font-weight: 400; }
+.menu-btn-drawer .menu-count { color: #8B6F47; }
 
-/* Botão "Desafio do dia" — linha própria, largura total */
 .menu-btn-daily {
   width: 100%;
-  max-width: 452px;
   height: 90px;
   flex-direction: row;
   gap: 12px;
   background: #F0F4FB;
   border-color: rgba(62, 124, 177, 0.35);
+  margin-top: 4px;
 }
 
 .menu-btn-daily:hover {
@@ -295,14 +308,8 @@ h1 {
   font-size: 13px;
 }
 
-.menu-btn-daily.done .menu-count {
-  color: #7FA87F;
-}
-
-.menu-btn-daily.streak .menu-count {
-  color: #E85A4F;
-  font-weight: 600;
-}
+.menu-btn-daily.done .menu-count { color: #7FA87F; }
+.menu-btn-daily.streak .menu-count { color: #E85A4F; font-weight: 600; }
 
 #menu-extras {
   display: flex;
@@ -340,6 +347,7 @@ h1 {
 #help-panel,
 #help-shelf-panel,
 #help-threads-panel,
+#help-drawer-panel,
 #achievements-panel,
 #daily-panel {
   position: fixed;
@@ -460,7 +468,6 @@ h1 {
 }
 .ach-label { flex: 1; }
 
-/* Painel de desafios diários */
 .daily-streak {
   font-size: 15px;
   font-weight: 500;
@@ -646,14 +653,6 @@ h1 {
   transform: translateY(-1px);
 }
 
-.win-btn:active {
-  transform: translateY(0) scale(0.97);
-}
-
-.win-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  transform: none;
-}
-
+.win-btn:active { transform: translateY(0) scale(0.97); }
+.win-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 .win-card.zen h2 { color: #E91E63; }

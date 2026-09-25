@@ -13,7 +13,7 @@
 <body>
   <div id="app">
     <h1>Desenrola</h1>
-    <p id="status">Escolha uma mecânica</p>
+    <p id="status">Carregando imagens…</p>
 
     <div id="game-area">
       <div id="hud">
@@ -32,8 +32,8 @@
       </div>
     </div>
 
-    <div id="menu">
-      <div class="menu-row">
+    <div id="menu" class="hidden">
+      <div class="menu-grid">
         <button class="menu-btn" id="btn-shelf">
           <span class="menu-icon">▤</span>
           <span class="menu-label">Prateleira</span>
@@ -49,6 +49,11 @@
           <span class="menu-label">Zen</span>
           <span class="menu-count">relax</span>
         </button>
+        <button class="menu-btn menu-btn-drawer" id="btn-drawer">
+          <span class="menu-icon">🗄</span>
+          <span class="menu-label">Gaveta</span>
+          <span class="menu-count" id="count-drawer">novo</span>
+        </button>
       </div>
       <button class="menu-btn menu-btn-daily" id="btn-daily">
         <span class="menu-icon">🎯</span>
@@ -57,7 +62,7 @@
       </button>
     </div>
 
-    <div id="menu-extras">
+    <div id="menu-extras" class="hidden">
       <button id="btn-help" type="button">❓ Ajuda</button>
       <button id="btn-achievements" type="button">🏆 Conquistas</button>
       <button id="btn-daily-panel" type="button">🎯 Desafios</button>
@@ -71,14 +76,17 @@
 
         <section class="help-section">
           <h3>▤ Prateleira</h3>
-          <p>Arraste objetos entre as prateleiras até que <strong>cada par de objetos iguais fique lado a lado</strong>.</p>
-          <p>Um par só vale quando os dois objetos estão em <strong>slots vizinhos</strong> na mesma prateleira.</p>
+          <p>Arraste as imagens entre as prateleiras até que <strong>cada par de imagens iguais fique lado a lado</strong>.</p>
         </section>
 
         <section class="help-section">
           <h3>〜 Fios</h3>
           <p>Arraste os nós para <strong>desembaraçar os fios</strong> até que nenhum cruze com outro.</p>
-          <p>Um fio fica <strong>azul brilhante</strong> quando está limpo.</p>
+        </section>
+
+        <section class="help-section">
+          <h3>🗄 Gaveta</h3>
+          <p>Arraste as imagens entre as gavetas até que <strong>cada gaveta contenha apenas um tema</strong>.</p>
         </section>
 
         <section class="help-section">
@@ -88,8 +96,7 @@
 
         <section class="help-section">
           <h3>🎯 Desafio do dia</h3>
-          <p>Uma fase especial que muda a cada dia, <strong>igual para todo mundo</strong>.</p>
-          <p>Você tem <strong>3 tentativas</strong> por dia. Só a melhor pontuação conta.</p>
+          <p>Uma fase especial que muda a cada dia, <strong>igual para todo mundo</strong>. Você tem <strong>3 tentativas</strong> por dia.</p>
         </section>
 
         <p class="help-hint">Dentro de cada jogo, toque em <strong>❓ Ajuda</strong> para ver os detalhes e bônus específicos.</p>
@@ -105,58 +112,32 @@
 
         <section class="help-section">
           <h3>Objetivo</h3>
-          <p>Arraste os objetos entre as prateleiras para que <strong>cada par de objetos iguais fique lado a lado</strong> na mesma prateleira.</p>
-          <p>Um par só conta quando os dois objetos ocupam <strong>slots vizinhos</strong>. Um espaço vazio no meio quebra o par.</p>
+          <p>Arraste as imagens entre as prateleiras para que <strong>cada par de imagens iguais fique lado a lado</strong> na mesma prateleira.</p>
+          <p>Um par só conta quando as duas imagens ocupam <strong>slots vizinhos</strong>. Um espaço vazio no meio quebra o par.</p>
         </section>
 
         <section class="help-section">
           <h3>Como jogar</h3>
           <ul>
-            <li>Toque e arraste um objeto para movê-lo.</li>
-            <li>Solte sobre a prateleira de destino — ele vai para o slot vago mais próximo.</li>
+            <li>Toque e arraste uma imagem para movê-la.</li>
+            <li>Solte sobre a prateleira de destino — ela vai para o slot vago mais próximo.</li>
             <li>Slots vagos aparecem com <strong>contorno azul pontilhado</strong>.</li>
             <li>O traço azul embaixo indica que o par está formado.</li>
-            <li>Complete todos os pares antes do tempo acabar.</li>
           </ul>
         </section>
 
         <section class="help-section">
-          <h3>⭐ Estrela (+50 pontos)</h3>
-          <p>Ocasionalmente, um par de objetos é substituído por <strong>duas estrelas douradas</strong>.</p>
-          <ul>
-            <li>Vale <strong>5× mais</strong> que um par normal.</li>
-            <li>Aparece no máximo <strong>1 vez por fase</strong>.</li>
-            <li>Disponível a partir do <strong>nível 3</strong>.</li>
-          </ul>
-        </section>
-
-        <section class="help-section">
-          <h3>🎁 Presente (+100 pontos)</h3>
-          <p>Mais raro que a estrela: um par de <strong>presentes rosas</strong>.</p>
-          <ul>
-            <li>Vale <strong>10× mais</strong> que um par normal.</li>
-            <li>Aparece no máximo <strong>1 vez por fase</strong>.</li>
-            <li>Disponível a partir do <strong>nível 4-5</strong> (dependendo do nível).</li>
-          </ul>
+          <h3>🎨 Temas</h3>
+          <p>Cada fase usa um <strong>tema sorteado</strong>: Animais, Comidas, Empresas, Ferramentas, Músicas ou Veículos.</p>
+          <p>As imagens são sorteadas do tema do dia.</p>
         </section>
 
         <section class="help-section">
           <h3>Pontuação</h3>
           <ul>
-            <li>Par normal: <strong>+10 pontos</strong></li>
-            <li>Par de estrela: <strong>+50 pontos</strong></li>
-            <li>Par de presente: <strong>+100 pontos</strong></li>
-            <li>Bônus de fase completa: <strong>+50 pontos</strong></li>
-            <li>Bônus de tempo: <strong>+2 pontos por segundo restante</strong></li>
-          </ul>
-        </section>
-
-        <section class="help-section">
-          <h3>Dicas</h3>
-          <ul>
-            <li>Cada par só pontua <strong>uma vez por fase</strong>, mesmo se você desfizer e refazer.</li>
-            <li>Quanto mais rápido completar, maior o bônus de tempo.</li>
-            <li>Use outra prateleira como "área de manobra" para reorganizar.</li>
+            <li>Par normal: <strong>+10</strong></li>
+            <li>Bônus de fase: <strong>+50</strong></li>
+            <li>Bônus de tempo: <strong>+2/s restante</strong></li>
           </ul>
         </section>
 
@@ -172,50 +153,69 @@
         <section class="help-section">
           <h3>Objetivo</h3>
           <p>Arraste os nós para <strong>desembaraçar os fios</strong> até que nenhum cruze com outro.</p>
-          <p>Um fio está "limpo" quando <strong>não cruza com nenhum outro fio</strong>.</p>
         </section>
 
         <section class="help-section">
           <h3>Como jogar</h3>
           <ul>
-            <li>Toque e arraste os <strong>nós internos</strong> (círculos com borda colorida) para mover o fio.</li>
-            <li>As extremidades (círculos cheios nas laterais) são fixas.</li>
+            <li>Toque e arraste os <strong>nós internos</strong> para mover o fio.</li>
             <li>Um fio fica <strong>azul brilhante</strong> quando está completamente limpo.</li>
-            <li>Complete todos os fios antes do tempo acabar.</li>
           </ul>
         </section>
 
         <section class="help-section">
           <h3>⚡ Fio Elétrico (+100 pontos)</h3>
-          <p>Às vezes um dos fios é <strong>dourado com um ⚡</strong> nas extremidades.</p>
+          <p>Um dos fios pode ser <strong>dourado com ⚡</strong>. Vale 5× mais.</p>
           <ul>
-            <li>Vale <strong>5× mais</strong> que um fio normal quando desembaraçado.</li>
-            <li>Aparece no máximo <strong>1 vez por fase</strong>.</li>
-            <li>Disponível a partir do <strong>nível 5</strong> (30% de chance).</li>
+            <li>Aparece a partir do <strong>nível 5</strong> (30% de chance).</li>
           </ul>
         </section>
 
         <section class="help-section">
           <h3>Pontuação</h3>
           <ul>
-            <li>Fio normal limpo: <strong>+20 pontos</strong></li>
-            <li>Fio elétrico limpo: <strong>+100 pontos</strong></li>
-            <li>Bônus de fase completa: <strong>+100 pontos</strong></li>
-            <li>Bônus de tempo: <strong>+2 pontos por segundo restante</strong></li>
-          </ul>
-        </section>
-
-        <section class="help-section">
-          <h3>Dicas</h3>
-          <ul>
-            <li>Cada fio só pontua <strong>uma vez por fase</strong>.</li>
-            <li>Você pode mover um fio que já está limpo — mas se ele cruzar de novo, o brilho some (mas os pontos ficam).</li>
-            <li>Fios com menos nós são mais fáceis de organizar.</li>
-            <li>Foque em "afastar" um fio dos outros antes de resolver os próximos.</li>
+            <li>Fio normal limpo: <strong>+20</strong></li>
+            <li>Fio elétrico limpo: <strong>+100</strong></li>
+            <li>Bônus de fase: <strong>+100</strong></li>
+            <li>Bônus de tempo: <strong>+2/s restante</strong></li>
           </ul>
         </section>
 
         <button id="btn-close-help-threads" class="btn-close-panel">Entendi</button>
+      </div>
+    </div>
+
+    <!-- Painel de ajuda — Gaveta -->
+    <div id="help-drawer-panel" class="hidden">
+      <div class="help-card">
+        <h2>🗄 Gaveta</h2>
+
+        <section class="help-section">
+          <h3>Objetivo</h3>
+          <p>Arraste imagens entre as gavetas até que <strong>cada gaveta contenha apenas um tema</strong>.</p>
+          <p>Os temas são: Animais, Comidas, Empresas, Ferramentas, Músicas e Veículos.</p>
+        </section>
+
+        <section class="help-section">
+          <h3>Como jogar</h3>
+          <ul>
+            <li>Toque e arraste uma imagem para movê-la entre gavetas.</li>
+            <li>Solte sobre uma gaveta — ela vai para o primeiro slot vago.</li>
+            <li>Quando uma gaveta fica com um <strong>único tema</strong>, ela brilha em verde-sálvia.</li>
+          </ul>
+        </section>
+
+        <section class="help-section">
+          <h3>Pontuação</h3>
+          <ul>
+            <li>Mover para a gaveta correta: <strong>+5</strong></li>
+            <li>Completar uma gaveta: <strong>+20</strong></li>
+            <li>Bônus de fase: <strong>+50</strong></li>
+            <li>Bônus de tempo: <strong>+2/s restante</strong></li>
+          </ul>
+        </section>
+
+        <button id="btn-close-help-drawer" class="btn-close-panel">Entendi</button>
       </div>
     </div>
 
