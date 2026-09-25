@@ -1,11 +1,11 @@
 /* ============================================================
-   DESENROLA — BACKUP 6 + Som ambiente via arquivo MP3
+   DESENROLA — BACKUP 6 + Som ambiente (arquivo mp3) + destrave
    ------------------------------------------------------------
-   Novidade desta versão:
-   - AmbientPlayer agora toca 'ambient.mp3' em loop.
-   - Fade-in de 2.5s ao iniciar (volume 0 → 0.35).
-   - Fade-out de 0.8s ao parar.
-   - Continua respeitando o mute geral (🔊) e o toggle do botão 🌊.
+   Correção desta versão:
+   - Destrave global de áudio no primeiro toque da página
+     (resolve bloqueio de autoplay do iOS Safari e Chrome Android).
+   - AmbientPlayer com retry automático em cada interação.
+   - Log de diagnóstico no console quando o play() é bloqueado.
    ============================================================ */
 
 (function () {
@@ -105,13 +105,10 @@
     CELEBRATION_DURATION: 1000,
     RETURN_DURATION: 300,
 
-    /* === Som ambiente (agora via arquivo mp3) === */
+    /* === Som ambiente (via arquivo mp3) === */
     AMBIENT: {
-      // Caminho do arquivo de áudio (deve estar na mesma pasta do index.html)
       SRC: 'ambient.mp3',
-      // Volume final (0..1). 0.35 é discreto mas audível.
       VOLUME: 0.35,
-      // Fade-in ao iniciar / fade-out ao parar (ms)
       FADE_IN_MS: 2500,
       FADE_OUT_MS: 800,
     },
@@ -402,51 +399,61 @@
   /* ------------------------------------------------------------
      AmbientPlayer — toca 'ambient.mp3' em loop
      ------------------------------------------------------------
-     - Cria um elemento <audio> na primeira chamada de start().
-     - Volume inicia em 0 e sobe suavemente até VOLUME.
-     - Ao parar, desce suavemente até 0 e depois pausa.
-     - Respeita o mute geral e o toggle do botão 🌊.
+     - Tenta tocar; se o navegador bloquear, marca como "pendente"
+       e tenta novamente em cada interação futura do usuário.
+     - Resolve o bloqueio de autoplay do iOS Safari e do
+       Chrome Android em modo restrito.
      ------------------------------------------------------------ */
   class AmbientPlayer {
     constructor() {
       this.audio = null;
       this.playing = false;
+      this.pending = false;
       this._fadeRaf = null;
+    }
+
+    _ensureAudioEl() {
+      if (this.audio) return;
+      try {
+        this.audio = new Audio(CONFIG.AMBIENT.SRC);
+        this.audio.loop = true;
+        this.audio.preload = 'auto';
+        this.audio.volume = 0;
+      } catch (e) {
+        this.audio = null;
+      }
     }
 
     start() {
       if (this.playing) return;
+      this._ensureAudioEl();
+      if (!this.audio) return;
 
-      // Cria o elemento na primeira vez
-      if (!this.audio) {
-        try {
-          this.audio = new Audio(CONFIG.AMBIENT.SRC);
-          this.audio.loop = true;
-          this.audio.preload = 'auto';
-          this.audio.volume = 0;
-        } catch (e) {
-          return; // falha silenciosa
-        }
-      }
+      this.pending = true;
 
-      // play() retorna uma Promise que pode rejeitar se o navegador
-      // bloquear antes de interação do usuário. Ignoramos.
       const p = this.audio.play();
       if (p && typeof p.then === 'function') {
         p.then(() => {
           this.playing = true;
+          this.pending = false;
           this._fadeTo(CONFIG.AMBIENT.VOLUME, CONFIG.AMBIENT.FADE_IN_MS);
-        }).catch(() => {
-          // Bloqueado. Não marca como playing.
+        }).catch((err) => {
+          this.playing = false;
+          // Bloqueado — tenta de novo no próximo gesto do usuário
+          console.log('[Ambient] play bloqueado:', err && err.name);
         });
       } else {
         this.playing = true;
+        this.pending = false;
         this._fadeTo(CONFIG.AMBIENT.VOLUME, CONFIG.AMBIENT.FADE_IN_MS);
       }
     }
 
     stop() {
-      if (!this.audio || !this.playing) return;
+      if (!this.audio || !this.playing) {
+        this.pending = false;
+        return;
+      }
       this._fadeTo(0, CONFIG.AMBIENT.FADE_OUT_MS, () => {
         try { this.audio.pause(); } catch (e) {}
         this.playing = false;
@@ -462,7 +469,6 @@
 
       const step = (now) => {
         const t = Math.min(1, (now - startTime) / durationMs);
-        // ease-in-out
         const eased = t < 0.5
           ? 2 * t * t
           : 1 - Math.pow(-2 * t + 2, 2) / 2;
@@ -485,6 +491,19 @@
         !Progress.data.muted;
       if (shouldPlay) this.start();
       else this.stop();
+    }
+
+    /** Chamado em cada interação do usuário — tenta destravar. */
+    retryIfPending() {
+      if (this.pending && !this.playing && this.audio) {
+        this.audio.play().then(() => {
+          this.playing = true;
+          this.pending = false;
+          this._fadeTo(CONFIG.AMBIENT.VOLUME, CONFIG.AMBIENT.FADE_IN_MS);
+        }).catch(() => {
+          // Ainda bloqueado. Tenta no próximo gesto.
+        });
+      }
     }
   }
 
@@ -1879,6 +1898,44 @@
         ambient.refresh(currentScene !== null);
       }
     });
+
+    // ---- Destrave global de áudio no primeiro toque ----
+    // Navegadores mobile exigem que o primeiro play() aconteça
+    // DENTRO do gesto do usuário. Tocamos um áudio silencioso na
+    // primeira interação e também criamos/resumimos o AudioContext.
+    let audioUnlocked = false;
+    function unlockAudioOnce() {
+      if (audioUnlocked) return;
+      audioUnlocked = true;
+
+      // 1) Destrava os efeitos (Web Audio API)
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) {
+          if (!audioCtx) audioCtx = new AC();
+          if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+      } catch (e) {}
+
+      // 2) Destrava o <audio> do ambiente tocando um som silencioso
+      try {
+        const silent = new Audio();
+        // 1 frame de silêncio em base64 (WAV)
+        silent.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+        silent.volume = 0;
+        const p = silent.play();
+        if (p && p.catch) p.catch(() => {});
+      } catch (e) {}
+
+      // 3) Se o ambiente estava pendente, tenta de novo agora
+      ambient.retryIfPending();
+    }
+
+    document.addEventListener('touchstart', unlockAudioOnce, { passive: true });
+    document.addEventListener('pointerdown', unlockAudioOnce, { passive: true });
+    document.addEventListener('mousedown', unlockAudioOnce, { passive: true });
+    document.addEventListener('keydown', unlockAudioOnce);
+    document.addEventListener('click', unlockAudioOnce);
 
     showMenu();
     requestAnimationFrame(loop);
