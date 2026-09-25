@@ -33,26 +33,34 @@
     </div>
 
     <div id="menu">
-      <button class="menu-btn" id="btn-shelf">
-        <span class="menu-icon">▤</span>
-        <span class="menu-label">Prateleira</span>
-        <span class="menu-count" id="count-shelf">novo</span>
-      </button>
-      <button class="menu-btn" id="btn-threads">
-        <span class="menu-icon">〜</span>
-        <span class="menu-label">Fios</span>
-        <span class="menu-count" id="count-threads">novo</span>
-      </button>
-      <button class="menu-btn menu-btn-zen" id="btn-zen">
-        <span class="menu-icon">🌿</span>
-        <span class="menu-label">Zen</span>
-        <span class="menu-count">relax</span>
+      <div class="menu-row">
+        <button class="menu-btn" id="btn-shelf">
+          <span class="menu-icon">▤</span>
+          <span class="menu-label">Prateleira</span>
+          <span class="menu-count" id="count-shelf">novo</span>
+        </button>
+        <button class="menu-btn" id="btn-threads">
+          <span class="menu-icon">〜</span>
+          <span class="menu-label">Fios</span>
+          <span class="menu-count" id="count-threads">novo</span>
+        </button>
+        <button class="menu-btn menu-btn-zen" id="btn-zen">
+          <span class="menu-icon">🌿</span>
+          <span class="menu-label">Zen</span>
+          <span class="menu-count">relax</span>
+        </button>
+      </div>
+      <button class="menu-btn menu-btn-daily" id="btn-daily">
+        <span class="menu-icon">🎯</span>
+        <span class="menu-label">Desafio do dia</span>
+        <span class="menu-count" id="count-daily">novo</span>
       </button>
     </div>
 
     <div id="menu-extras">
       <button id="btn-help" type="button">❓ Ajuda</button>
       <button id="btn-achievements" type="button">🏆 Conquistas</button>
+      <button id="btn-daily-panel" type="button">🎯 Desafios</button>
       <button id="btn-reset" type="button">Zerar progresso</button>
     </div>
 
@@ -76,6 +84,12 @@
         <section class="help-section">
           <h3>🌿 Zen</h3>
           <p>Modo relaxante, <strong>sem tempo e sem pontos</strong>. Escolhe uma mecânica aleatória.</p>
+        </section>
+
+        <section class="help-section">
+          <h3>🎯 Desafio do dia</h3>
+          <p>Uma fase especial que muda a cada dia, <strong>igual para todo mundo</strong>.</p>
+          <p>Você tem <strong>3 tentativas</strong> por dia. Só a melhor pontuação conta.</p>
         </section>
 
         <p class="help-hint">Dentro de cada jogo, toque em <strong>❓ Ajuda</strong> para ver os detalhes e bônus específicos.</p>
@@ -214,18 +228,49 @@
       </div>
     </div>
 
+    <!-- Painel de desafios -->
+    <div id="daily-panel" class="hidden">
+      <div class="ach-card">
+        <h2>🎯 Desafios</h2>
+        <div id="daily-streak-display" class="daily-streak">
+          🔥 <span id="daily-streak-count">0</span> dias seguidos
+        </div>
+        <ul id="daily-list"></ul>
+        <button id="btn-close-daily" class="btn-close-panel">Fechar</button>
+      </div>
+    </div>
+
     <div id="toast" class="hidden">
       <span id="toast-icon">🏆</span>
       <span id="toast-text">Conquista desbloqueada!</span>
     </div>
 
+    <!-- Overlay de vitória normal -->
     <div id="win-overlay" class="hidden">
       <div class="win-card">
         <h2 id="win-title">Prateleira pareada ✓</h2>
         <p id="win-points">+0 pontos</p>
         <p id="win-breakdown" class="win-breakdown"></p>
         <p id="win-total" class="win-total">Total: 0 pontos</p>
-        <button id="btn-next-level">Próximo nível</button>
+        <div class="win-actions">
+          <button id="btn-share" class="win-btn win-btn-share">📤 Compartilhar</button>
+          <button id="btn-next-level" class="win-btn win-btn-next">Próximo nível</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Overlay de vitória do desafio diário -->
+    <div id="daily-win-overlay" class="hidden">
+      <div class="win-card">
+        <h2 id="daily-win-title">Desafio do dia ✓</h2>
+        <p id="daily-win-points">+0 pontos</p>
+        <p id="daily-win-attempts" class="win-breakdown"></p>
+        <p id="daily-win-best" class="win-total">Melhor do dia: 0 pontos</p>
+        <div class="win-actions">
+          <button id="btn-daily-share" class="win-btn win-btn-share">📤 Compartilhar</button>
+          <button id="btn-daily-retry" class="win-btn win-btn-next">🔄 Tentar novamente</button>
+          <button id="btn-daily-close" class="win-btn win-btn-next">← Menu</button>
+        </div>
       </div>
     </div>
   </div>

@@ -1,17 +1,22 @@
 /* ============================================================
-   DESENROLA — BACKUP 6 + Som ambiente (arquivo mp3) + destrave
+   DESENROLA — BACKUP 6 + Som ambiente + Compartilhar + Desafio Diário
    ------------------------------------------------------------
-   Correção desta versão:
-   - Destrave global de áudio no primeiro toque da página
-     (resolve bloqueio de autoplay do iOS Safari e Chrome Android).
-   - AmbientPlayer com retry automático em cada interação.
-   - Log de diagnóstico no console quando o play() é bloqueado.
+   Novidade desta versão:
+   - Botão "🎯 Desafio do dia" no menu (linha própria).
+   - Fase determinística por data (mesma para todos).
+   - 3 tentativas por dia, melhor pontuação conta.
+   - Streak de dias consecutivos.
+   - Histórico dos últimos 7 desafios (painel "🎯 Desafios").
+   - 3 conquistas novas (primeiro/três/semana).
+   - Compartilhamento específico do desafio.
    ============================================================ */
 
 (function () {
   'use strict';
 
   const CONFIG = {
+    SHARE_URL: 'https://seu-usuario.github.io/desenrola/',
+
     SHELF_LEVELS: [
       { shelves: 2, pairs: 2, starChance: 0,    giftChance: 0    },
       { shelves: 2, pairs: 3, starChance: 0,    giftChance: 0    },
@@ -26,6 +31,13 @@
     ],
     ZEN_SHELF: { shelves: 2, pairs: 3, starChance: 0.15, giftChance: 0.08 },
     ZEN_THREADS: { threads: 4, nodes: 4 },
+
+    /* Nível fixo do desafio diário — usa a entrada índice 4 (nível 5) */
+    DAILY_SHELF_LEVEL_IDX: 4,
+    DAILY_THREADS_LEVEL_IDX: 4,
+
+    /* Tentativas por dia */
+    DAILY_MAX_ATTEMPTS: 3,
 
     THREAD_LEVELS: [
       { threads: 3, nodes: 3 },
@@ -105,7 +117,6 @@
     CELEBRATION_DURATION: 1000,
     RETURN_DURATION: 300,
 
-    /* === Som ambiente (via arquivo mp3) === */
     AMBIENT: {
       SRC: 'ambient.mp3',
       VOLUME: 0.35,
@@ -122,6 +133,9 @@
       { id: 'star',          icon: '⭐', name: 'Estrela-guia',         desc: 'Pareie uma estrela' },
       { id: 'gift',          icon: '🎁', name: 'Presente perfeito',    desc: 'Pareie um presente' },
       { id: 'score_1000',    icon: '🏆', name: 'Mil pontos',           desc: 'Acumule 1000 pontos' },
+      { id: 'daily_first',   icon: '🎯', name: 'Primeiro desafio',     desc: 'Complete 1 desafio diário' },
+      { id: 'daily_3',       icon: '🔥', name: 'Três seguidos',        desc: '3 dias de desafio seguidos' },
+      { id: 'daily_7',       icon: '🌟', name: 'Semana perfeita',      desc: '7 dias de desafio seguidos' },
     ],
 
     STORAGE_KEY: 'desenrola.progress.v1',
@@ -137,6 +151,7 @@
   const btnShelf = document.getElementById('btn-shelf');
   const btnThreads = document.getElementById('btn-threads');
   const btnZen = document.getElementById('btn-zen');
+  const btnDaily = document.getElementById('btn-daily');
   const btnMute = document.getElementById('btn-mute');
   const btnAmbient = document.getElementById('btn-ambient');
   const btnHelp = document.getElementById('btn-help');
@@ -149,11 +164,17 @@
   const btnCloseHelpThreads = document.getElementById('btn-close-help-threads');
   const countShelf = document.getElementById('count-shelf');
   const countThreads = document.getElementById('count-threads');
+  const countDaily = document.getElementById('count-daily');
   const btnReset = document.getElementById('btn-reset');
   const btnAchievements = document.getElementById('btn-achievements');
+  const btnDailyPanel = document.getElementById('btn-daily-panel');
   const achPanel = document.getElementById('achievements-panel');
   const achList = document.getElementById('ach-list');
   const btnCloseAch = document.getElementById('btn-close-ach');
+  const dailyPanel = document.getElementById('daily-panel');
+  const dailyList = document.getElementById('daily-list');
+  const dailyStreakCount = document.getElementById('daily-streak-count');
+  const btnCloseDaily = document.getElementById('btn-close-daily');
   const toast = document.getElementById('toast');
   const toastIcon = document.getElementById('toast-icon');
   const toastText = document.getElementById('toast-text');
@@ -167,9 +188,77 @@
   const winBreakdown = document.getElementById('win-breakdown');
   const winTotal = document.getElementById('win-total');
   const btnNextLevel = document.getElementById('btn-next-level');
+  const btnShare = document.getElementById('btn-share');
+  const dailyWinOverlay = document.getElementById('daily-win-overlay');
+  const dailyWinTitle = document.getElementById('daily-win-title');
+  const dailyWinPoints = document.getElementById('daily-win-points');
+  const dailyWinAttempts = document.getElementById('daily-win-attempts');
+  const dailyWinBest = document.getElementById('daily-win-best');
+  const btnDailyShare = document.getElementById('btn-daily-share');
+  const btnDailyRetry = document.getElementById('btn-daily-retry');
+  const btnDailyClose = document.getElementById('btn-daily-close');
+
+  /* ============================================================
+     PRNG — gerador pseudo-aleatório determinístico (mulberry32)
+     ============================================================ */
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a |= 0;
+      a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /** Hash simples de string → inteiro de 32 bits. */
+  function hashString(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
+  /** Retorna a data atual em YYYY-MM-DD no fuso local. */
+  function todayKey() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  /**
+   * Decide o mecanismo do desafio do dia baseado na data.
+   * Segunda/Quarta/Sexta/Sábado: Prateleira
+   * Terça/Quinta: Fios
+   * Domingo: aleatório (determinístico pela seed)
+   */
+  function dailyMechanicForDate(dateKey) {
+    const d = new Date(dateKey + 'T12:00:00');
+    const dow = d.getDay(); // 0=dom, 1=seg, ...
+    if (dow === 0) {
+      // Domingo: aleatório determinístico
+      const seed = hashString(dateKey + '-sunday');
+      return (seed % 2 === 0) ? 'shelf' : 'threads';
+    }
+    if (dow === 2 || dow === 4) return 'threads'; // ter, qui
+    return 'shelf'; // seg, qua, sex, sáb
+  }
 
   const Progress = {
-    data: { shelf: 0, threads: 0, score: 0, achievements: [], muted: false, ambient: true },
+    data: {
+      shelf: 0, threads: 0, score: 0, achievements: [], muted: false, ambient: true,
+      daily: {
+        streak: 0,
+        lastCompletedDate: null,
+        history: [],
+        today: { date: null, attemptsUsed: 0, bestScore: 0, completed: false },
+      },
+    },
     load() {
       try {
         const raw = localStorage.getItem(CONFIG.STORAGE_KEY);
@@ -182,11 +271,28 @@
             this.data.achievements = Array.isArray(parsed.achievements) ? parsed.achievements : [];
             this.data.muted = !!parsed.muted;
             this.data.ambient = parsed.ambient === undefined ? true : !!parsed.ambient;
+            if (parsed.daily && typeof parsed.daily === 'object') {
+              this.data.daily = {
+                streak: Number(parsed.daily.streak) || 0,
+                lastCompletedDate: parsed.daily.lastCompletedDate || null,
+                history: Array.isArray(parsed.daily.history) ? parsed.daily.history : [],
+                today: parsed.daily.today && typeof parsed.daily.today === 'object'
+                  ? {
+                      date: parsed.daily.today.date || null,
+                      attemptsUsed: Number(parsed.daily.today.attemptsUsed) || 0,
+                      bestScore: Number(parsed.daily.today.bestScore) || 0,
+                      completed: !!parsed.daily.today.completed,
+                    }
+                  : { date: null, attemptsUsed: 0, bestScore: 0, completed: false },
+              };
+            }
           }
         }
       } catch (e) {
-        this.data = { shelf: 0, threads: 0, score: 0, achievements: [], muted: false, ambient: true };
+        // mantém defaults
       }
+      // Reset diário: se a data mudou, zera o "today"
+      this.ensureTodayReset();
     },
     save() {
       try { localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(this.data)); } catch (e) {}
@@ -196,7 +302,17 @@
     },
     addScore(points) { this.data.score += points; this.save(); },
     reset() {
-      this.data = { shelf: 0, threads: 0, score: 0, achievements: [], muted: this.data.muted, ambient: this.data.ambient };
+      const keepMute = this.data.muted;
+      const keepAmbient = this.data.ambient;
+      this.data = {
+        shelf: 0, threads: 0, score: 0, achievements: [], muted: keepMute, ambient: keepAmbient,
+        daily: {
+          streak: 0,
+          lastCompletedDate: null,
+          history: [],
+          today: { date: null, attemptsUsed: 0, bestScore: 0, completed: false },
+        },
+      };
       try { localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(this.data)); } catch (e) {}
     },
     hasAchievement(id) { return this.data.achievements.indexOf(id) >= 0; },
@@ -215,6 +331,36 @@
       this.data.ambient = !this.data.ambient;
       this.save();
       return this.data.ambient;
+    },
+
+    /** Garante que `today` reflete o dia atual. */
+    ensureTodayReset() {
+      const tk = todayKey();
+      if (this.data.daily.today.date !== tk) {
+        this.data.daily.today = {
+          date: tk,
+          attemptsUsed: 0,
+          bestScore: 0,
+          completed: false,
+        };
+        this.save();
+      }
+    },
+
+    /** Calcula se o streak continua (conta ontem) ou quebrou. */
+    updateStreakIfNeeded() {
+      const tk = todayKey();
+      const last = this.data.daily.lastCompletedDate;
+      if (!last) return;
+      // Diferença em dias entre hoje e a última conclusão
+      const d1 = new Date(tk + 'T12:00:00');
+      const d2 = new Date(last + 'T12:00:00');
+      const diffDays = Math.round((d1 - d2) / 86400000);
+      if (diffDays > 1) {
+        // Quebrou o streak (ficou > 1 dia sem completar)
+        this.data.daily.streak = 0;
+        this.save();
+      }
     },
   };
 
@@ -254,6 +400,12 @@
     if (Progress.data.threads >= 5) tryUnlock('thread_5');
     if (Progress.data.score >= 1000) tryUnlock('score_1000');
   }
+  function checkAchievementsAfterDaily() {
+    tryUnlock('daily_first');
+    const s = Progress.data.daily.streak;
+    if (s >= 3) tryUnlock('daily_3');
+    if (s >= 7) tryUnlock('daily_7');
+  }
   function renderAchievements() {
     achList.innerHTML = '';
     for (const a of CONFIG.ACHIEVEMENTS) {
@@ -263,6 +415,29 @@
       li.innerHTML = `<span class="ach-badge">${unlocked ? a.icon : '🔒'}</span>
                       <span class="ach-label">${a.name}<br><small style="opacity:0.7">${a.desc}</small></span>`;
       achList.appendChild(li);
+    }
+  }
+  function renderDailyPanel() {
+    dailyStreakCount.textContent = String(Progress.data.daily.streak);
+    dailyList.innerHTML = '';
+    const history = Progress.data.daily.history.slice(-7).reverse();
+    if (history.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'daily-item-empty';
+      li.textContent = 'Nenhum desafio registrado ainda.';
+      dailyList.appendChild(li);
+      return;
+    }
+    for (const entry of history) {
+      const li = document.createElement('li');
+      const icon = entry.mechanic === 'threads' ? '〜' : '▤';
+      const [y, m, d] = entry.date.split('-');
+      const dateLabel = `${d}/${m}`;
+      const scoreLabel = entry.completed ? `${entry.bestScore} pts` : '—';
+      li.innerHTML = `<span class="daily-item-date">${dateLabel}</span>
+                      <span class="daily-item-mechanic">${icon}</span>
+                      <span class="daily-item-score">${scoreLabel}</span>`;
+      dailyList.appendChild(li);
     }
   }
   function openHelpGeneral() {
@@ -298,6 +473,15 @@
     achPanel.classList.add('hidden');
     achPanel.style.display = 'none';
   }
+  function openDailyPanel() {
+    renderDailyPanel();
+    dailyPanel.classList.remove('hidden');
+    dailyPanel.style.display = 'flex';
+  }
+  function closeDailyPanel() {
+    dailyPanel.classList.add('hidden');
+    dailyPanel.style.display = 'none';
+  }
   function openContextHelp() {
     if (currentScene === 'shelf') openHelpShelf();
     else if (currentScene === 'threads') openHelpThreads();
@@ -310,9 +494,8 @@
   }
 
   /* ============================================================
-     ÁUDIO — Efeitos (sintetizados) + Ambiente (arquivo MP3)
+     ÁUDIO
      ============================================================ */
-
   let audioCtx = null;
   function ensureAudio() {
     if (Progress.data.muted) return null;
@@ -396,14 +579,7 @@
     _tone(1760, 0.10, 0.10, 'sine', now + 0.02);
   }
 
-  /* ------------------------------------------------------------
-     AmbientPlayer — toca 'ambient.mp3' em loop
-     ------------------------------------------------------------
-     - Tenta tocar; se o navegador bloquear, marca como "pendente"
-       e tenta novamente em cada interação futura do usuário.
-     - Resolve o bloqueio de autoplay do iOS Safari e do
-       Chrome Android em modo restrito.
-     ------------------------------------------------------------ */
+  /* AmbientPlayer */
   class AmbientPlayer {
     constructor() {
       this.audio = null;
@@ -411,7 +587,6 @@
       this.pending = false;
       this._fadeRaf = null;
     }
-
     _ensureAudioEl() {
       if (this.audio) return;
       try {
@@ -419,18 +594,13 @@
         this.audio.loop = true;
         this.audio.preload = 'auto';
         this.audio.volume = 0;
-      } catch (e) {
-        this.audio = null;
-      }
+      } catch (e) { this.audio = null; }
     }
-
     start() {
       if (this.playing) return;
       this._ensureAudioEl();
       if (!this.audio) return;
-
       this.pending = true;
-
       const p = this.audio.play();
       if (p && typeof p.then === 'function') {
         p.then(() => {
@@ -439,7 +609,6 @@
           this._fadeTo(CONFIG.AMBIENT.VOLUME, CONFIG.AMBIENT.FADE_IN_MS);
         }).catch((err) => {
           this.playing = false;
-          // Bloqueado — tenta de novo no próximo gesto do usuário
           console.log('[Ambient] play bloqueado:', err && err.name);
         });
       } else {
@@ -448,65 +617,43 @@
         this._fadeTo(CONFIG.AMBIENT.VOLUME, CONFIG.AMBIENT.FADE_IN_MS);
       }
     }
-
     stop() {
-      if (!this.audio || !this.playing) {
-        this.pending = false;
-        return;
-      }
+      if (!this.audio || !this.playing) { this.pending = false; return; }
       this._fadeTo(0, CONFIG.AMBIENT.FADE_OUT_MS, () => {
         try { this.audio.pause(); } catch (e) {}
         this.playing = false;
       });
     }
-
     _fadeTo(target, durationMs, onDone) {
       if (!this.audio) return;
       if (this._fadeRaf) cancelAnimationFrame(this._fadeRaf);
-
       const startVol = this.audio.volume;
       const startTime = performance.now();
-
       const step = (now) => {
         const t = Math.min(1, (now - startTime) / durationMs);
-        const eased = t < 0.5
-          ? 2 * t * t
-          : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
         const v = startVol + (target - startVol) * eased;
         try { this.audio.volume = Math.max(0, Math.min(1, v)); } catch (e) {}
-        if (t < 1) {
-          this._fadeRaf = requestAnimationFrame(step);
-        } else {
-          this._fadeRaf = null;
-          if (onDone) onDone();
-        }
+        if (t < 1) this._fadeRaf = requestAnimationFrame(step);
+        else { this._fadeRaf = null; if (onDone) onDone(); }
       };
       this._fadeRaf = requestAnimationFrame(step);
     }
-
     refresh(inGame) {
-      const shouldPlay =
-        inGame &&
-        Progress.data.ambient &&
-        !Progress.data.muted;
+      const shouldPlay = inGame && Progress.data.ambient && !Progress.data.muted;
       if (shouldPlay) this.start();
       else this.stop();
     }
-
-    /** Chamado em cada interação do usuário — tenta destravar. */
     retryIfPending() {
       if (this.pending && !this.playing && this.audio) {
         this.audio.play().then(() => {
           this.playing = true;
           this.pending = false;
           this._fadeTo(CONFIG.AMBIENT.VOLUME, CONFIG.AMBIENT.FADE_IN_MS);
-        }).catch(() => {
-          // Ainda bloqueado. Tenta no próximo gesto.
-        });
+        }).catch(() => {});
       }
     }
   }
-
   const ambient = new AmbientPlayer();
 
   function dist(x1, y1, x2, y2) { return Math.hypot(x2 - x1, y2 - y1); }
@@ -581,6 +728,160 @@
       statusEl.classList.toggle('win', !!isWin);
       statusEl.classList.remove('changing');
     }, 200);
+  }
+
+  /* ============================================================
+     COMPARTILHAR — card 600×315
+     ============================================================ */
+  function generateShareCard(mechanicOverride) {
+    const W_CARD = 600;
+    const H_CARD = 315;
+    const c = document.createElement('canvas');
+    c.width = W_CARD;
+    c.height = H_CARD;
+    const g = c.getContext('2d');
+
+    g.fillStyle = '#FFF5E6';
+    g.fillRect(0, 0, W_CARD, H_CARD);
+
+    g.strokeStyle = 'rgba(210, 105, 30, 0.35)';
+    g.lineWidth = 3;
+    g.strokeRect(12, 12, W_CARD - 24, H_CARD - 24);
+
+    g.fillStyle = '#5C2E0E';
+    g.font = '300 42px system-ui, -apple-system, "Segoe UI", sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText('Desenrola', W_CARD / 2, 70);
+
+    g.strokeStyle = 'rgba(62, 124, 177, 0.4)';
+    g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(W_CARD / 2 - 60, 100);
+    g.lineTo(W_CARD / 2 + 60, 100);
+    g.stroke();
+
+    // Determina o conteúdo
+    let mainLabel = '';
+    let mainValue = '';
+    let subLabel = '';
+    let mechanicIcon = '🌿';
+    let mechanicName = 'Zen';
+
+    if (mechanicOverride === 'daily') {
+      const streak = Progress.data.daily.streak;
+      mainLabel = 'DESAFIO DO DIA';
+      mainValue = `${Progress.data.daily.today.bestScore}`;
+      subLabel = 'pontos' + (streak > 0 ? ` · 🔥 ${streak} dias` : '');
+      const mech = dailyMechanicForDate(todayKey());
+      mechanicIcon = mech === 'threads' ? '〜' : '▤';
+      mechanicName = mech === 'threads' ? 'Fios' : 'Prateleira';
+    } else {
+      const level = Progress.data.shelf + 1;
+      mainLabel = 'NÍVEL';
+      mainValue = String(level);
+      subLabel = `${Progress.data.score} pontos`;
+      if (currentScene === 'shelf') { mechanicIcon = '▤'; mechanicName = 'Prateleira'; }
+      else if (currentScene === 'threads') { mechanicIcon = '〜'; mechanicName = 'Fios'; }
+    }
+
+    g.fillStyle = '#A0522D';
+    g.font = '400 20px system-ui, -apple-system, "Segoe UI", sans-serif';
+    g.fillText(mainLabel, W_CARD / 2, 140);
+
+    g.fillStyle = '#3E7CB1';
+    g.font = '300 72px system-ui, -apple-system, "Segoe UI", sans-serif';
+    g.fillText(mainValue, W_CARD / 2, 190);
+
+    g.fillStyle = '#5C2E0E';
+    g.font = '400 26px system-ui, -apple-system, "Segoe UI", sans-serif';
+    g.fillText(subLabel, W_CARD / 2, 240);
+
+    g.fillStyle = '#3E7CB1';
+    g.font = '500 20px system-ui, -apple-system, "Segoe UI", sans-serif';
+    g.fillText(`${mechanicIcon}  ${mechanicName}`, W_CARD / 2, 280);
+
+    return c;
+  }
+
+  function canvasToBlob(c) {
+    return new Promise((resolve) => {
+      if (c.toBlob) c.toBlob((blob) => resolve(blob), 'image/png');
+      else resolve(null);
+    });
+  }
+
+  async function shareScore() {
+    const card = generateShareCard('normal');
+    const text = `Completei o nível ${Progress.data.shelf + 1} do Desenrola com ${Progress.data.score} pontos! 🌿\nJogue em: ${CONFIG.SHARE_URL}`;
+
+    if (navigator.share && navigator.canShare) {
+      try {
+        const blob = await canvasToBlob(card);
+        if (blob) {
+          const file = new File([blob], 'desenrola.png', { type: 'image/png' });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({ title: 'Desenrola', text, files: [file] });
+            return;
+          }
+        }
+        await navigator.share({ title: 'Desenrola', text });
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;
+      }
+    }
+
+    try {
+      const url = card.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `desenrola-nivel-${Progress.data.shelf + 1}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setStatus('Imagem salva para compartilhar 📤', false);
+    } catch (e) {
+      setStatus('Não foi possível gerar a imagem', false);
+    }
+  }
+
+  async function shareDailyScore() {
+    const card = generateShareCard('daily');
+    const streak = Progress.data.daily.streak;
+    const score = Progress.data.daily.today.bestScore;
+    const streakText = streak > 0 ? ` · 🔥 ${streak} dias seguidos` : '';
+    const text = `Fiz ${score} pontos no Desafio do Dia do Desenrola!${streakText} 🌿\nJogue em: ${CONFIG.SHARE_URL}`;
+
+    if (navigator.share && navigator.canShare) {
+      try {
+        const blob = await canvasToBlob(card);
+        if (blob) {
+          const file = new File([blob], 'desenrola-desafio.png', { type: 'image/png' });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({ title: 'Desafio do Desenrola', text, files: [file] });
+            return;
+          }
+        }
+        await navigator.share({ title: 'Desafio do Desenrola', text });
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;
+      }
+    }
+
+    try {
+      const url = card.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `desenrola-desafio-${todayKey()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setStatus('Imagem salva para compartilhar 📤', false);
+    } catch (e) {
+      setStatus('Não foi possível gerar a imagem', false);
+    }
   }
 
   /* Desenhos dos objetos */
@@ -777,8 +1078,24 @@
     }
   }
 
+  /* ============================================================
+     VARIÁVEIS GLOBAIS DE ESTADO
+     ============================================================ */
   let zenMode = false;
+  let dailyMode = false;
+  let dailyMechanic = null;   // 'shelf' | 'threads' quando em modo daily
+  let dailySeedRng = null;    // PRNG determinístico ativo (ou null)
+  let dailyAttemptScore = 0;  // pontos ganhos na tentativa atual
+
   function getShelfParams() {
+    if (dailyMode) {
+      // Nível fixo 5 para todos, mas com seed determinístico
+      const base = CONFIG.SHELF_LEVELS[CONFIG.DAILY_SHELF_LEVEL_IDX];
+      const slotsPerShelf = base.pairs * 2 + 1;
+      const totalPairs = base.pairs * base.shelves;
+      const timeLimit = 30 + totalPairs * 8;
+      return { level: 5, zen: false, daily: true, shelves: base.shelves, pairs: base.pairs, slotsPerShelf, starChance: base.starChance, giftChance: base.giftChance, timeLimit };
+    }
     if (zenMode) {
       const base = CONFIG.ZEN_SHELF;
       const slotsPerShelf = base.pairs * 2 + 1;
@@ -792,6 +1109,11 @@
     return { level: idx + 1, zen: false, shelves: base.shelves, pairs: base.pairs, slotsPerShelf, starChance: base.starChance, giftChance: base.giftChance, timeLimit };
   }
   function getThreadsParams() {
+    if (dailyMode) {
+      const base = CONFIG.THREAD_LEVELS[CONFIG.DAILY_THREADS_LEVEL_IDX];
+      const timeLimit = 40 + base.threads * 15;
+      return { level: 5, zen: false, daily: true, threadCount: base.threads, nodesPerThread: base.nodes, timeLimit };
+    }
     if (zenMode) {
       const base = CONFIG.ZEN_THREADS;
       return { level: 0, zen: true, threadCount: base.threads, nodesPerThread: base.nodes, timeLimit: 9999 };
@@ -806,6 +1128,11 @@
   let currentScene = null;
   let lastTime = 0;
 
+  /** Helpers para usar o PRNG determinístico quando em modo daily. */
+  function rng() {
+    return dailySeedRng ? dailySeedRng() : Math.random();
+  }
+
   /* CENA: PRATELEIRA */
   const ShelfScene = {
     shelves: [], items: [], dragging: null, returning: [],
@@ -814,11 +1141,12 @@
     timeLeft: 0, scoreThisPhase: 0, pairsFormed: 0, totalPairs: 0,
     _prevPairs: new Set(), _scoredPairs: new Set(),
     _statNormal: 0, _statStar: 0, _statGift: 0, _timeBonus: 0,
-    _pulseTime: 0, _zen: false,
+    _pulseTime: 0, _zen: false, _daily: false,
 
     reset() {
       this.params = getShelfParams();
       this._zen = !!this.params.zen;
+      this._daily = !!this.params.daily;
       this.shelves = [];
       this.items = [];
       this.dragging = null;
@@ -858,7 +1186,7 @@
       const totalPairs = numShelves * pairsPerShelf;
       const pool = CONFIG.OBJECT_TYPES.slice();
       for (let i = pool.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
+        const j = Math.floor(rng() * (i + 1));
         [pool[i], pool[j]] = [pool[j], pool[i]];
       }
       const pairList = [];
@@ -866,12 +1194,12 @@
         pairList.push({ pairId: p, type: pool[p % pool.length].id, palette: pool[p % pool.length].palette, kind: 'normal' });
       }
 
-      const wantStar = Math.random() < this.params.starChance;
-      const wantGift = Math.random() < this.params.giftChance;
+      const wantStar = rng() < this.params.starChance;
+      const wantGift = rng() < this.params.giftChance;
       if (wantStar || wantGift) {
         const idxs = pairList.map((_, i) => i);
         for (let i = idxs.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
+          const j = Math.floor(rng() * (i + 1));
           [idxs[i], idxs[j]] = [idxs[j], idxs[i]];
         }
         let cursor = 0;
@@ -896,13 +1224,13 @@
         }
       }
       for (let i = allItems.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
+        const j = Math.floor(rng() * (i + 1));
         [allItems[i], allItems[j]] = [allItems[j], allItems[i]];
       }
 
       const emptyPerShelf = new Set();
       for (let s = 0; s < numShelves; s++) {
-        const slotToEmpty = Math.floor(Math.random() * slotsPerShelf);
+        const slotToEmpty = Math.floor(rng() * slotsPerShelf);
         emptyPerShelf.add(`${s}:${slotToEmpty}`);
       }
       const fillable = [];
@@ -912,7 +1240,7 @@
         }
       }
       for (let i = fillable.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
+        const j = Math.floor(rng() * (i + 1));
         [fillable[i], fillable[j]] = [fillable[j], fillable[i]];
       }
       const numToPlace = Math.min(allItems.length, fillable.length);
@@ -924,11 +1252,11 @@
         this.items.push(item);
       }
       if (this._isComplete()) {
-        const a = this.items[Math.floor(Math.random() * this.items.length)];
-        let b = this.items[Math.floor(Math.random() * this.items.length)];
+        const a = this.items[Math.floor(rng() * this.items.length)];
+        let b = this.items[Math.floor(rng() * this.items.length)];
         let tries = 0;
         while ((b === a || b.shelfIndex === a.shelfIndex) && tries < 30) {
-          b = this.items[Math.floor(Math.random() * this.items.length)];
+          b = this.items[Math.floor(rng() * this.items.length)];
           tries++;
         }
         this._swapItems(a, b);
@@ -1079,8 +1407,8 @@
             else if (kind === 'estrela') playBonus();
             else playSnapByFamily(family);
           } else {
-            if (kind === 'estrela') { this.scoreThisPhase += CONFIG.POINTS_STAR; this._statStar++; playBonus(); tryUnlock('star'); }
-            else if (kind === 'presente') { this.scoreThisPhase += CONFIG.POINTS_GIFT; this._statGift++; playGiftSound(); tryUnlock('gift'); }
+            if (kind === 'estrela') { this.scoreThisPhase += CONFIG.POINTS_STAR; this._statStar++; playBonus(); if (!this._daily) tryUnlock('star'); }
+            else if (kind === 'presente') { this.scoreThisPhase += CONFIG.POINTS_GIFT; this._statGift++; playGiftSound(); if (!this._daily) tryUnlock('gift'); }
             else { this.scoreThisPhase += CONFIG.POINTS_NORMAL; this._statNormal++; playSnapByFamily(family); }
           }
           this.pairsFormed++;
@@ -1129,6 +1457,7 @@
       playComplete();
       if (navigator.vibrate) { try { navigator.vibrate(50); } catch (e) {} }
       if (this._zen) { setStatus('Zen concluído 🌿', true); return; }
+      if (this._daily) { finishDailyAttempt(this.scoreThisPhase); return; }
       setStatus('Prateleira pareada ✓', true);
       this.scoreThisPhase += CONFIG.POINTS_PHASE_BONUS;
       const timeBonus = Math.floor(this.timeLeft) * CONFIG.POINTS_PER_SECOND_LEFT;
@@ -1299,7 +1628,7 @@
     for (let j = 0; j < nodesPerThread; j++) {
       const t = (j + 1) / (nodesPerThread + 1);
       const x = margin + usableW * t;
-      const y = margin + Math.random() * usableH;
+      const y = margin + rng() * usableH;
       nodes.push({ x, y });
     }
     const thread = { endpoints, nodes, color, samples: [], hoverScale: 1, isElectric: !!isElectric, isClean: false, cleanPulse: 0 };
@@ -1331,11 +1660,12 @@
     timeLeft: 0, scoreThisPhase: 0,
     _scoredThreads: new Set(),
     _statNormal: 0, _statElectric: 0, _timeBonus: 0,
-    _prevClean: new Set(), _zen: false,
+    _prevClean: new Set(), _zen: false, _daily: false,
 
     reset() {
       this.params = getThreadsParams();
       this._zen = !!this.params.zen;
+      this._daily = !!this.params.daily;
       this.threads = [];
       this.dragging = null;
       this.complete = false;
@@ -1349,9 +1679,9 @@
       this._prevClean = new Set();
 
       const { threadCount, nodesPerThread } = this.params;
-      const canHaveElectric = !this._zen && Progress.data.threads >= 4;
-      const wantElectric = canHaveElectric && Math.random() < CONFIG.THREAD_ELECTRIC_CHANCE;
-      const electricIndex = wantElectric ? Math.floor(Math.random() * threadCount) : -1;
+      const canHaveElectric = !this._zen && (this._daily || Progress.data.threads >= 4);
+      const wantElectric = canHaveElectric && rng() < CONFIG.THREAD_ELECTRIC_CHANCE;
+      const electricIndex = wantElectric ? Math.floor(rng() * threadCount) : -1;
 
       for (let i = 0; i < threadCount; i++) {
         const isElectric = (i === electricIndex);
@@ -1386,7 +1716,7 @@
           if (this._zen) {
             if (th.isElectric) playElectricSound(); else playThreadClean();
           } else {
-            if (th.isElectric) { this.scoreThisPhase += CONFIG.THREAD_POINTS_ELECTRIC; this._statElectric++; playElectricSound(); tryUnlock('electric'); }
+            if (th.isElectric) { this.scoreThisPhase += CONFIG.THREAD_POINTS_ELECTRIC; this._statElectric++; playElectricSound(); if (!this._daily) tryUnlock('electric'); }
             else { this.scoreThisPhase += CONFIG.THREAD_POINTS_CLEAN; this._statNormal++; playThreadClean(); }
           }
           th.cleanPulse = 600;
@@ -1558,6 +1888,7 @@
       playComplete();
       if (navigator.vibrate) { try { navigator.vibrate(50); } catch (e) {} }
       if (this._zen) { setStatus('Zen concluído 🌿', true); return; }
+      if (this._daily) { finishDailyAttempt(this.scoreThisPhase); return; }
       setStatus('Fios desembaraçados ✓', true);
       this.scoreThisPhase += CONFIG.THREAD_POINTS_PHASE_BONUS;
       const timeBonus = Math.floor(this.timeLeft) * CONFIG.POINTS_PER_SECOND_LEFT;
@@ -1628,6 +1959,21 @@
         hudScore.classList.add('hidden');
         return;
       }
+      if (p.daily) {
+        hudLevel.textContent = '🎯 Desafio';
+        hudLevel.classList.remove('hidden');
+        const done = ShelfScene._scoredPairs.size;
+        const total = ShelfScene.totalPairs;
+        hudPairs.textContent = `Pares: ${done}/${total}`;
+        hudPairs.classList.remove('hidden');
+        const t = Math.max(0, Math.ceil(ShelfScene.timeLeft));
+        hudTimer.textContent = `⏱ ${t}s`;
+        hudTimer.classList.remove('hidden');
+        hudTimer.classList.toggle('danger', t <= 15);
+        hudScore.textContent = `⭐ ${ShelfScene.scoreThisPhase}`;
+        hudScore.classList.remove('hidden');
+        return;
+      }
       hudLevel.textContent = `Nível ${p.level}`;
       hudLevel.classList.remove('hidden');
       const done = ShelfScene._scoredPairs.size;
@@ -1648,6 +1994,21 @@
         hudPairs.classList.add('hidden');
         hudTimer.classList.add('hidden');
         hudScore.classList.add('hidden');
+        return;
+      }
+      if (p.daily) {
+        hudLevel.textContent = '🎯 Desafio';
+        hudLevel.classList.remove('hidden');
+        const done = ThreadsScene._scoredThreads.size;
+        const total = ThreadsScene.threads.length;
+        hudPairs.textContent = `Fios: ${done}/${total}`;
+        hudPairs.classList.remove('hidden');
+        const t = Math.max(0, Math.ceil(ThreadsScene.timeLeft));
+        hudTimer.textContent = `⏱ ${t}s`;
+        hudTimer.classList.remove('hidden');
+        hudTimer.classList.toggle('danger', t <= 15);
+        hudScore.textContent = `⭐ ${ThreadsScene.scoreThisPhase}`;
+        hudScore.classList.remove('hidden');
         return;
       }
       hudLevel.textContent = `Nível ${p.level}`;
@@ -1702,6 +2063,19 @@
     countShelf.classList.toggle('empty', s === 0);
     countThreads.textContent = t === 0 ? 'novo' : `Nível ${Math.min(t + 1, CONFIG.THREAD_LEVELS.length)}`;
     countThreads.classList.toggle('empty', t === 0);
+    // Botão do desafio: mostrar streak ou "novo"
+    const streak = Progress.data.daily.streak;
+    const today = Progress.data.daily.today;
+    btnDaily.classList.remove('done', 'streak');
+    if (today.completed) {
+      countDaily.textContent = `${today.bestScore} pts · ✓`;
+      btnDaily.classList.add('done');
+    } else if (streak > 0) {
+      countDaily.textContent = `🔥 ${streak} dia${streak > 1 ? 's' : ''}`;
+      btnDaily.classList.add('streak');
+    } else {
+      countDaily.textContent = 'novo';
+    }
   }
   function updateMuteButton() {
     btnMute.textContent = Progress.data.muted ? '🔇' : '🔊';
@@ -1722,16 +2096,29 @@
     winOverlay.classList.add('hidden');
     winOverlay.style.display = 'none';
   }
+  function hideDailyWinOverlay() {
+    dailyWinOverlay.classList.remove('visible');
+    dailyWinOverlay.classList.add('hidden');
+    dailyWinOverlay.style.display = 'none';
+  }
+
   function showMenu() {
     hideWinOverlay();
+    hideDailyWinOverlay();
     closeAllHelps();
+    closeAchievements();
+    closeDailyPanel();
     zenMode = false;
+    dailyMode = false;
+    dailySeedRng = null;
+    dailyMechanic = null;
     fadeCanvas(() => {
       currentScene = null;
       menuEl.classList.remove('hidden');
       gameAreaEl.classList.add('hidden');
       btnReset.classList.remove('hidden');
       btnAchievements.classList.remove('hidden');
+      btnDailyPanel.classList.remove('hidden');
       btnHelp.classList.remove('hidden');
       setStatus('Escolha uma mecânica', false);
       updateMenuCounters();
@@ -1740,14 +2127,20 @@
     });
     ambient.refresh(false);
   }
+
   function showGame(which, isZen) {
     hideWinOverlay();
+    hideDailyWinOverlay();
     closeAllHelps();
     zenMode = !!isZen;
+    dailyMode = false;
+    dailySeedRng = null;
+    dailyMechanic = null;
     menuEl.classList.add('hidden');
     gameAreaEl.classList.remove('hidden');
     btnReset.classList.add('hidden');
     btnAchievements.classList.add('hidden');
+    btnDailyPanel.classList.add('hidden');
     btnHelp.classList.add('hidden');
     const size = setupCanvas();
     W = size.width; H = size.height;
@@ -1767,10 +2160,148 @@
     canvas.classList.add('fading');
     requestAnimationFrame(() => { requestAnimationFrame(() => canvas.classList.remove('fading')); });
   }
+
   function showZen() {
     const which = Math.random() < 0.5 ? 'shelf' : 'threads';
     showGame(which, true);
   }
+
+  /** Inicia o Desafio do Dia. */
+  function showDaily() {
+    Progress.ensureTodayReset();
+    if (Progress.data.daily.today.attemptsUsed >= CONFIG.DAILY_MAX_ATTEMPTS) {
+      setStatus('Você já usou as 3 tentativas de hoje 🎯', false);
+      return;
+    }
+
+    const tk = todayKey();
+    const mech = dailyMechanicForDate(tk);
+    dailyMechanic = mech;
+    dailyMode = true;
+    zenMode = false;
+
+    // Seed determinística pela data (mais o número da tentativa não — a fase é a mesma)
+    const seed = hashString('daily-' + tk);
+    dailySeedRng = mulberry32(seed);
+
+    hideWinOverlay();
+    hideDailyWinOverlay();
+    closeAllHelps();
+    menuEl.classList.add('hidden');
+    gameAreaEl.classList.remove('hidden');
+    btnReset.classList.add('hidden');
+    btnAchievements.classList.add('hidden');
+    btnDailyPanel.classList.add('hidden');
+    btnHelp.classList.add('hidden');
+    const size = setupCanvas();
+    W = size.width; H = size.height;
+    currentScene = mech;
+    dailyAttemptScore = 0;
+
+    if (mech === 'shelf') {
+      ShelfScene.reset();
+      btnNew.textContent = '🎯 Reiniciar';
+      setStatus('🎯 Desafio do dia — Prateleira', false);
+    } else {
+      ThreadsScene.reset();
+      btnNew.textContent = '🎯 Reiniciar';
+      setStatus('🎯 Desafio do dia — Fios', false);
+    }
+    updateMuteButton();
+    updateAmbientButton();
+    ambient.refresh(true);
+    canvas.classList.add('fading');
+    requestAnimationFrame(() => { requestAnimationFrame(() => canvas.classList.remove('fading')); });
+  }
+
+  /** Chamado quando o jogador completa uma tentativa do desafio. */
+  function finishDailyAttempt(score) {
+    const tk = todayKey();
+    Progress.ensureTodayReset();
+
+    Progress.data.daily.today.attemptsUsed = Math.min(
+      CONFIG.DAILY_MAX_ATTEMPTS,
+      Progress.data.daily.today.attemptsUsed + 1
+    );
+    if (score > Progress.data.daily.today.bestScore) {
+      Progress.data.daily.today.bestScore = score;
+    }
+
+    // Só marca como completed e atualiza streak se for a primeira vez que completa hoje
+    const firstTimeToday = !Progress.data.daily.today.completed;
+    if (firstTimeToday) {
+      Progress.data.daily.today.completed = true;
+      // Atualiza streak
+      const last = Progress.data.daily.lastCompletedDate;
+      if (last === tk) {
+        // já contava hoje (improvável, mas seguro)
+      } else {
+        // Calcula se é continuação
+        if (last) {
+          const d1 = new Date(tk + 'T12:00:00');
+          const d2 = new Date(last + 'T12:00:00');
+          const diffDays = Math.round((d1 - d2) / 86400000);
+          if (diffDays === 1) {
+            Progress.data.daily.streak += 1;
+          } else {
+            Progress.data.daily.streak = 1;
+          }
+        } else {
+          Progress.data.daily.streak = 1;
+        }
+        Progress.data.daily.lastCompletedDate = tk;
+      }
+
+      // Adiciona/atualiza no histórico (mantém só 7)
+      Progress.data.daily.history.push({
+        date: tk,
+        mechanic: dailyMechanic,
+        bestScore: Progress.data.daily.today.bestScore,
+        attemptsUsed: Progress.data.daily.today.attemptsUsed,
+        completed: true,
+      });
+      if (Progress.data.daily.history.length > 7) {
+        Progress.data.daily.history = Progress.data.daily.history.slice(-7);
+      }
+
+      // Conquistas
+      checkAchievementsAfterDaily();
+    } else {
+      // Já tinha completado hoje — atualiza o histórico com o novo best
+      const h = Progress.data.daily.history.find(e => e.date === tk);
+      if (h) {
+        h.bestScore = Progress.data.daily.today.bestScore;
+        h.attemptsUsed = Progress.data.daily.today.attemptsUsed;
+      }
+    }
+
+    Progress.save();
+    showDailyWinOverlay();
+  }
+
+  function showDailyWinOverlay() {
+    const today = Progress.data.daily.today;
+    const remaining = CONFIG.DAILY_MAX_ATTEMPTS - today.attemptsUsed;
+
+    dailyWinTitle.textContent = today.completed ? 'Desafio do dia ✓' : 'Fim do desafio';
+    dailyWinPoints.textContent = `+${dailyAttemptScore} pontos`;
+    dailyWinAttempts.textContent = `Tentativas usadas: ${today.attemptsUsed}/${CONFIG.DAILY_MAX_ATTEMPTS}`;
+    dailyWinBest.textContent = `Melhor do dia: ${today.bestScore} pontos`;
+
+    if (remaining <= 0) {
+      btnDailyRetry.disabled = true;
+      btnDailyRetry.textContent = '🔄 Sem tentativas';
+    } else {
+      btnDailyRetry.disabled = false;
+      btnDailyRetry.textContent = `🔄 Tentar novamente (${remaining})`;
+    }
+
+    dailyWinOverlay.classList.remove('hidden');
+    dailyWinOverlay.style.display = 'flex';
+    void dailyWinOverlay.offsetWidth;
+    dailyWinOverlay.classList.add('visible');
+  }
+
   function setupCanvas() {
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
@@ -1783,6 +2314,7 @@
   btnShelf.addEventListener('click', () => showGame('shelf', false));
   btnThreads.addEventListener('click', () => showGame('threads', false));
   btnZen.addEventListener('click', () => showZen());
+  btnDaily.addEventListener('click', () => showDaily());
   btnMenu.addEventListener('click', () => showMenu());
 
   btnMute.addEventListener('click', () => {
@@ -1800,6 +2332,19 @@
   });
 
   btnNew.addEventListener('click', () => {
+    if (dailyMode) {
+      // Reiniciar a fase do desafio (mesma seed) — mas NÃO gasta tentativa extra
+      // porque a tentativa só é contada ao COMPLETAR.
+      dailySeedRng = mulberry32(hashString('daily-' + todayKey()));
+      if (currentScene === 'shelf') {
+        ShelfScene.reset();
+        setStatus('🎯 Desafio do dia — Prateleira', false);
+      } else {
+        ThreadsScene.reset();
+        setStatus('🎯 Desafio do dia — Fios', false);
+      }
+      return;
+    }
     if (currentScene === 'shelf') {
       ShelfScene.reset();
       setStatus(zenMode ? 'Zen 🌿' : 'Junte os pares lado a lado', false);
@@ -1808,6 +2353,7 @@
       setStatus(zenMode ? 'Zen 🌿' : 'Arraste os nós até nenhum fio se cruzar', false);
     }
   });
+
   btnNextLevel.addEventListener('click', () => {
     hideWinOverlay();
     if (currentScene === 'shelf') {
@@ -1818,8 +2364,32 @@
       setStatus('Arraste os nós até nenhum fio se cruzar', false);
     }
   });
+
+  btnShare.addEventListener('click', shareScore);
+  btnDailyShare.addEventListener('click', shareDailyScore);
+
+  btnDailyRetry.addEventListener('click', () => {
+    hideDailyWinOverlay();
+    if (Progress.data.daily.today.attemptsUsed >= CONFIG.DAILY_MAX_ATTEMPTS) return;
+    // Regenera a mesma fase (mesma seed) e deixa o jogador tentar de novo
+    dailySeedRng = mulberry32(hashString('daily-' + todayKey()));
+    dailyAttemptScore = 0;
+    if (currentScene === 'shelf') {
+      ShelfScene.reset();
+      setStatus('🎯 Desafio do dia — Prateleira', false);
+    } else if (currentScene === 'threads') {
+      ThreadsScene.reset();
+      setStatus('🎯 Desafio do dia — Fios', false);
+    }
+  });
+
+  btnDailyClose.addEventListener('click', () => {
+    hideDailyWinOverlay();
+    showMenu();
+  });
+
   btnReset.addEventListener('click', () => {
-    const ok = confirm('Zerar todo o progresso salvo? Isso volta ao nível 1, à pontuação 0 e às conquistas.');
+    const ok = confirm('Zerar todo o progresso salvo? Isso volta ao nível 1, à pontuação 0, às conquistas e ao histórico de desafios.');
     if (!ok) return;
     Progress.reset();
     updateMenuCounters();
@@ -1838,17 +2408,23 @@
   btnAchievements.addEventListener('click', openAchievements);
   btnCloseAch.addEventListener('click', closeAchievements);
 
+  btnDailyPanel.addEventListener('click', openDailyPanel);
+  btnCloseDaily.addEventListener('click', closeDailyPanel);
+
   function init() {
     Progress.load();
+    Progress.updateStreakIfNeeded();
+    Progress.ensureTodayReset();
     updateMuteButton();
     updateAmbientButton();
 
-    const allPanels = [helpPanel, helpShelfPanel, helpThreadsPanel, achPanel, winOverlay, toast];
+    const allPanels = [helpPanel, helpShelfPanel, helpThreadsPanel, achPanel, dailyPanel, winOverlay, dailyWinOverlay, toast];
     for (const p of allPanels) {
       p.classList.add('hidden');
       p.style.display = 'none';
     }
     winOverlay.classList.remove('visible');
+    dailyWinOverlay.classList.remove('visible');
     toast.classList.remove('visible');
 
     const size = setupCanvas();
@@ -1899,16 +2475,10 @@
       }
     });
 
-    // ---- Destrave global de áudio no primeiro toque ----
-    // Navegadores mobile exigem que o primeiro play() aconteça
-    // DENTRO do gesto do usuário. Tocamos um áudio silencioso na
-    // primeira interação e também criamos/resumimos o AudioContext.
     let audioUnlocked = false;
     function unlockAudioOnce() {
       if (audioUnlocked) return;
       audioUnlocked = true;
-
-      // 1) Destrava os efeitos (Web Audio API)
       try {
         const AC = window.AudioContext || window.webkitAudioContext;
         if (AC) {
@@ -1916,21 +2486,15 @@
           if (audioCtx.state === 'suspended') audioCtx.resume();
         }
       } catch (e) {}
-
-      // 2) Destrava o <audio> do ambiente tocando um som silencioso
       try {
         const silent = new Audio();
-        // 1 frame de silêncio em base64 (WAV)
         silent.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
         silent.volume = 0;
         const p = silent.play();
         if (p && p.catch) p.catch(() => {});
       } catch (e) {}
-
-      // 3) Se o ambiente estava pendente, tenta de novo agora
       ambient.retryIfPending();
     }
-
     document.addEventListener('touchstart', unlockAudioOnce, { passive: true });
     document.addEventListener('pointerdown', unlockAudioOnce, { passive: true });
     document.addEventListener('mousedown', unlockAudioOnce, { passive: true });
