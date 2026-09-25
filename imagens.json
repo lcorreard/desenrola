@@ -1,0 +1,107 @@
+{
+  "versao": 1,
+  "temas": [
+    {
+      "id": "animais",
+      "nome": "Animais",
+      "emoji": "🐾",
+      "imagens": [
+        "imagens/Animais/borboleta.svg",
+        "imagens/Animais/cachorro.svg",
+        "imagens/Animais/canguru.svg",
+        "imagens/Animais/carangueijo.svg",
+        "imagens/Animais/gato.svg",
+        "imagens/Animais/jacare.svg",
+        "imagens/Animais/lagarto.svg",
+        "imagens/Animais/macaco.svg",
+        "imagens/Animais/onca.svg",
+        "imagens/Animais/sapo.svg"
+      ]
+    },
+    {
+      "id": "comidas",
+      "nome": "Comidas",
+      "emoji": "🍽",
+      "imagens": [
+        "imagens/Comidas/abacate.svg",
+        "imagens/Comidas/bife.svg",
+        "imagens/Comidas/cereja.svg",
+        "imagens/Comidas/laranja.svg",
+        "imagens/Comidas/limao.svg",
+        "imagens/Comidas/maca.svg",
+        "imagens/Comidas/melancia.svg",
+        "imagens/Comidas/ovo.svg",
+        "imagens/Comidas/peixe.svg",
+        "imagens/Comidas/uva.svg"
+      ]
+    },
+    {
+      "id": "empresas",
+      "nome": "Empresas",
+      "emoji": "🏢",
+      "imagens": [
+        "imagens/Empresas/amazon.svg",
+        "imagens/Empresas/apple.svg",
+        "imagens/Empresas/drive.svg",
+        "imagens/Empresas/dropbox.svg",
+        "imagens/Empresas/facebook.svg",
+        "imagens/Empresas/firefox.svg",
+        "imagens/Empresas/google.svg",
+        "imagens/Empresas/linkedin.svg",
+        "imagens/Empresas/flip.svg",
+        "imagens/Empresas/twitter.svg"
+      ]
+    },
+    {
+      "id": "ferramentas",
+      "nome": "Ferramentas",
+      "emoji": "🔧",
+      "imagens": [
+        "imagens/Ferramentas/chaves.svg",
+        "imagens/Ferramentas/fenda.svg",
+        "imagens/Ferramentas/pa.svg",
+        "imagens/Ferramentas/rolopintura.svg",
+        "imagens/Ferramentas/serrote.svg",
+        "imagens/Ferramentas/trena.svg",
+        "imagens/Ferramentas/furadeira.svg",
+        "imagens/Ferramentas/serra.svg",
+        "imagens/Ferramentas/martelo.svg",
+        "imagens/Ferramentas/alicate.svg"
+      ]
+    },
+    {
+      "id": "musicas",
+      "nome": "Musicas",
+      "emoji": "🎵",
+      "imagens": [
+        "imagens/Musicas/arcodeon.svg",
+        "imagens/Musicas/bateria.svg",
+        "imagens/Musicas/gaita.svg",
+        "imagens/Musicas/guitarra.svg",
+        "imagens/Musicas/teclado.svg",
+        "imagens/Musicas/violino.svg",
+        "imagens/Musicas/trompete.svg",
+        "imagens/Musicas/piano.svg",
+        "imagens/Musicas/saxofone.svg",
+        "imagens/Musicas/tambor.svg"
+      ]
+    },
+    {
+      "id": "veiculos",
+      "nome": "Veiculos",
+      "emoji": "🚗",
+      "imagens": [
+        "imagens/Veiculos/aviao.svg",
+        "imagens/Veiculos/bicicleta.svg",
+        "imagens/Veiculos/carro.svg",
+        "imagens/Veiculos/helicoptero.svg",
+        "imagens/Veiculos/moto.svg",
+        "imagens/Veiculos/onibus.svg",
+        "imagens/Veiculos/lambreta.svg",
+        "imagens/Veiculos/foguete.svg",
+        "imagens/Veiculos/barco.svg",
+        "imagens/Veiculos/bus.svg"
+      ]
+    }
+  ]
+}
